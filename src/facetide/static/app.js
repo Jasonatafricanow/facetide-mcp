@@ -54,10 +54,20 @@ function renderOverview(){
  const rated=Object.keys(scores).length;
  $('quickSummary').textContent=rated?rated+' 个领域已有本人评价':'开始记录自己的生活判断';
  $('growthAxis').textContent=r?.personal_growth||'尚无记录';
- $('realizationAxis').textContent=r?.self_realization||'尚无记录';
+ $('realizationAxis').textContent=r?.self_realization||'尚无已确认记录';
+ if(!r?.personal_growth){
+   const candidates=state.context?.axis_drafts?.personal_growth?.insights?.filter(x=>x.kind==='cross_event_inference');
+   if(candidates?.length)$('growthAxis').textContent='Agent 未确认草稿：'+candidates[0].summary;
+ }
+ if(!r?.self_realization){
+   const candidates=state.context?.axis_drafts?.self_realization?.insights?.filter(x=>x.kind==='cross_event_inference');
+   if(candidates?.length)$('realizationAxis').textContent='Agent 未确认草稿：'+candidates[0].summary;
+ }
  $('domainCards').innerHTML=domainMeta.map(([id,name,icon,desc])=>{
   const score=scores[id],goals=s.goals.filter(g=>g.domain_ids.includes(id)).length;
-  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${Number.isInteger(score)?score:'—'} <small>/ 5</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><div class="bar"><span style="width:${Number.isInteger(score)?score*20:0}%"></span></div></article>`;
+  const card=(state.context?.domain_cards||[]).find(c=>c.domain_id===id);
+  const evidence=card?.evidence?.[0];
+  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${Number.isInteger(score)?score:'—'} <small>/ 5</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><p class="observed-mini">${evidence?escapeHtml(evidence.summary):'本期暂无相关证据'} <small>${evidence?'来源：'+escapeHtml(evidence.source_type)+' · 未确认':'未知不等于退步'}</small></p><div class="bar"><span style="width:${Number.isInteger(score)?score*20:0}%"></span></div></article>`;
  }).join('');
 }
 function renderRatingRows(previous={}){
@@ -99,6 +109,7 @@ async function loadContext(){
   state.ratings={};state.revisionOf=null;$('revisionNotice').hidden=true;$('reviewConfirm').checked=false;
   for(const id of ['growthInput','realizationInput','reviewNote'])$(id).value='';
   renderContext(ctx);
+  if(state.snapshot)renderOverview();
   return ctx;
  }catch(e){toast(e.message,true);return null}
 }
@@ -230,8 +241,6 @@ async function init(){
   $('resetGoal').addEventListener('click',resetGoal);
   $('cancelRevision').addEventListener('click',()=>{state.revisionOf=null;$('revisionNotice').hidden=true});
   await reload();
-  // Initial view pulls evidence without requiring a manual scoring session.
-  await loadContext();
  }catch(e){toast('无法连接本地服务：'+e.message,true)}
 }
 window.addEventListener('DOMContentLoaded',init);
