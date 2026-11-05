@@ -4,7 +4,7 @@
 
 Facetide does not calculate a happiness score, replace your memory system, or require daily check-ins. It organizes existing evidence for periodic reflection; only the user decides whether a domain is satisfying, what counts as enough, and whether a goal is worth continuing.
 
-## Current version: 0.2.0 — Agent core + browser workbench
+## Current version: 0.3.0 — Multi-source semantic assembly + browser workbench
 
 In addition to the MCP protocol, v0.2 includes a **local four-view workbench** with a seven-sector wheel, guided period reviews, selected evidence refs, goal lifecycle editor and immutable history.
 
@@ -19,6 +19,22 @@ See [Product workbench and MR-Mem setup](docs/product-workbench.md). The UI and 
 
 **Optional native read-only MR-Mem AML adapter:** specify both `FACETIDE_MRMEM_DIR` and `FACETIDE_MRMEM_USER_ID`. It projects verified canonical memories from existing `memory.sqlite` and `aml_source.sqlite` with scoped fingerprints, no runtime migrations. Missing life-domain classification is left unclassified, not fabricated. This adapter has synthetic-contract tests but not live-production validation.
 
+## The actual 7+2 data pipeline
+
+See [Semantic Assembly](docs/semantic-assembly.md) for the source-backed cross-domain compilation loop. Connect the MCP server to an existing conversational Agent and invoke its `facetide_reflection_guide` prompt. The host Agent calls `facetide_get_compilation_batch`, interprets each item semantically (including irrelevant ones), calls `facetide_compile_batch`, and then queries `facetide_prepare_review`. This creates seven populated evidence cards and two editable, cited narrative axes. **Users only need to assess their own satisfaction scores and final judgment.**
+
+The compiler is a rebuildable materialized projection with source hash validation. It never changes canonical MR-Mem, never promotes agent-generated narratives into user statements, and never auto-scores. The local Web UI alone cannot semantically compile records: the host Agent must trigger the MCP workflow.
+
+### Other MCP sources (opt-in generic bridge)
+
+To include future providers without writing a new native adapter, configure an explicit allowlist:
+
+~~~sh
+export FACETIDE_BRIDGE_ALLOWED_SOURCES=calendar,github
+~~~
+
+A host Agent can query these other MCP providers and forward **only a compact observation with a real original provider record ID, occurred/known times, and optional domain tags** to `facetide_publish_source_bundle`. The bridge stores revisable source-referenced projections, not full provider data. It is disabled by default. **The host-attested observations are not independently verified by Facetide**, and revisions/deletions must be republished by the host. Do not send full transcripts, clinical records, credentials, or secrets.
+
 ## MVP status
 
 - Seven life domains with optional **user-owned 1–5 ratings**.
@@ -27,7 +43,7 @@ See [Product workbench and MR-Mem setup](docs/product-workbench.md). The UI and 
 - A goal can support multiple life domains.
 - Immutable confirmed review snapshots (including goal versions), append-only corrections, score history.
 - Read-only **JSONL evidence adapter** with source references, separate occurred/known timestamps, explicit retraction, and cross-domain links.
-- Five stdio MCP tools plus a reflection prompt, local workbench, SQLite persistence, no telemetry.
+- Eight stdio MCP tools (including a two-stage semantic compiler and optional host source bridge) plus reflection prompt, local workbench, SQLite persistence, no telemetry.
 
 This is a runnable single-user core and local workbench. Narrow MR-Mem **AML** and Nutrition-Tracker-MCP **recent 7/30-day report** read-only adapters are implemented against their published contracts. Broader historical integrations and live NAS verification remain outstanding.
 
@@ -74,6 +90,9 @@ The evidence file environment variable is optional. Without it, Facetide still s
 | MCP tool | Operation |
 | --- | --- |
 | \`facetide_get_snapshot\` | Seven domains, latest ratings, goals and status |
+| \`facetide_publish_source_bundle\` | Optional host-bridged source projections from allowed providers |
+| \`facetide_get_compilation_batch\` | Read bounded multi-source records for host Agent classification |
+| \`facetide_compile_batch\` | Persist source-verified provisional 7+2 mappings and narrative proposals |
 | \`facetide_prepare_review\` | Time-bounded evidence + previous snapshot + candidate changes |
 | \`facetide_upsert_goal\` | Create/replace a user-approved goal, checking version on edits |
 | \`facetide_save_review\` | Freeze a user-approved review with source refs |

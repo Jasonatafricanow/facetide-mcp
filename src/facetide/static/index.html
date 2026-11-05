@@ -22,8 +22,13 @@
 <div class="review-layout"><div class="review-main">
 <article class="panel"><div class="panel-heading">01 / 选择观察区间 <span class="pill">按发生时间</span></div><div class="date-row"><label>开始日期<input type="date" id="startDate"></label><label>结束日期<input type="date" id="endDate"></label><button class="secondary" id="loadContext">提取变化证据</button></div><p class="soft">按需读取，不自动写入生活评分。</p></article>
 <article class="panel"><div class="panel-heading">02 / 这段时间发生了什么 <span class="pill" id="evidenceCount">尚未查询</span></div><div id="evidenceList" class="evidence-list"><div class="empty">提取现有记录，或者直接进行手动复盘。</div></div><div id="warnings" class="warning"></div></article>
-<article class="panel"><div class="panel-heading">03 / 本人满意度 <span class="pill">1—5 分，可留空</span></div><p class="soft">旧评分仅用于对照，不作为本次默认值。</p><div id="ratingRows"></div></article>
-<article class="panel"><div class="panel-heading">04 / 阶段变化与反思</div><div class="change-grid">
+<article class="panel"><div class="panel-heading">03 / 七个领域的已编译观察 <span class="pill" id="compilationStatus">尚未整理</span></div>
+<p class="soft">以下来自已有记忆与专业数据的证据关联，由 Agent 编译，不是你的满意度评分；尚未归类的内容会明确提示。</p>
+<div id="compiledDomains" class="compiled-domains"><div class="empty">连接 Agent 后运行 Facetide 复盘编译，再刷新本期证据。</div></div>
+<div id="compilationWarnings" class="warning"></div>
+</article>
+<article class="panel"><div class="panel-heading">04 / 本人满意度 <span class="pill">1—5 分，可留空</span></div><p class="soft">旧评分仅用于对照，不作为本次默认值。</p><div id="ratingRows"></div></article>
+<article class="panel"><div class="panel-heading">05 / 阶段变化与反思 <span class="pill">Agent 草稿 · 本人确认</span></div><div class="change-grid">
 <label>新变化<textarea id="changeNew" rows="3" placeholder="每行一项"></textarea></label><label>稳定的部分<textarea id="changeStable" rows="3" placeholder="每行一项"></textarea></label><label>退潮的部分<textarea id="changeReceding" rows="3" placeholder="每行一项"></textarea></label></div>
 <div class="two-col"><label>个人成长<textarea id="growthInput" rows="3" placeholder="世界如何改变了我"></textarea></label><label>自我实现<textarea id="realizationInput" rows="3" placeholder="我如何改变了世界"></textarea></label></div>
 <label>本人补充反思<textarea id="reviewNote" rows="3"></textarea></label>

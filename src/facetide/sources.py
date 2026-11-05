@@ -100,3 +100,37 @@ class JsonlSource:
                  if period_start <= calendar_date(item["occurred_at"]) <= period_end]
         items.sort(key=lambda item: (item["occurred_at"], item["source_type"], item["source_ref"]))
         return items, warnings
+
+
+
+class HostBridgeSource:
+    """Read-only imported source *projections* from approved host Agent tools.
+
+    Explicitly not independently verified against the original provider. The
+    provider's original records must remain under its own data authority.
+    """
+
+    def __init__(self, db_path: str | Path, allowed_providers: set[str]):
+        self.db_path = Path(db_path)
+        self.allowed_providers = {p.strip().lower() for p in allowed_providers}
+
+    def query(self, period_start, period_end, domains):
+        import sqlite3
+        result, warnings = [], []
+        with sqlite3.connect(self.db_path) as db:
+            rows = db.execute("SELECT payload_json FROM host_bridge_evidence").fetchall()
+        for (raw,) in rows:
+            try:
+                item = normalize_evidence(json.loads(raw), domains)
+                # Revoking a subset of provider permissions immediately hides
+                # previously cached events from that provider.
+                provider = item["source_type"].removeprefix("bridge:")
+                if not item["source_type"].startswith("bridge:") or provider not in self.allowed_providers:
+                    continue
+                if period_start <= calendar_date(item["occurred_at"]) <= period_end:
+                    result.append(item)
+            except (TypeError, ValueError, KeyError) as exc:
+                warnings.append(f"Invalid host-bridged source: {exc}")
+        if result:
+            warnings.insert(0, "Host-bridged records have provider IDs but Facetide cannot independently revalidate provider contents; treat as provisional until source hydration.")
+        return result, warnings[:20]

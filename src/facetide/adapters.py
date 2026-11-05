@@ -237,7 +237,10 @@ class NutritionMcpSource:
                 ]
             details = [("nutrition", report.get("nutrition")), ("health", report.get("health"))]
             result = []
-            now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            # This is the observed reporting window, not a verified report
+            # publication timestamp. Avoid fabricating a fresh known_at value
+            # on every retrieval (which would invalidate semantic projections).
+            now = None
             for category, values in details:
                 if not isinstance(values, dict):
                     continue
