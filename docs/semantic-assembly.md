@@ -103,3 +103,23 @@ Values, sources and events are illustrative, not user's real records.
 - An MR-Mem AML semantic store may lack a trusted event time or be capped to 2,000 records per query by its existing adapter. Source coverage is consequently incomplete; warnings and pending counts are surfaced.
 - No end-to-end integration on private MR-Mem/Nutrition production deployment, no formal precision/recall benchmark of the host classifier, and no automatic causal truth guarantee.
 - Narrative compilations are suggestions, not authenticated user self-reports. Their provenance and uncertainty must be presented honestly.
+
+## Other Agent tools and MCP providers (opt-in)
+
+A host Agent can call `facetide_publish_source_bundle` after reading another provider's existing records. Configure `FACETIDE_BRIDGE_ALLOWED_SOURCES` for the exact permitted provider IDs. Each item must carry the **real original provider source ID**. Facetide stores only a brief source-referenced projection:
+
+~~~json
+{
+  "records": [{
+    "provider": "calendar",
+    "source_ref": "provider-event-123",
+    "occurred_at": "2026-10-18",
+    "known_at": "2026-10-18T12:30:00+00:00",
+    "domain_ids": ["career", "social"],
+    "summary": "Brief observation, not a full calendar dump",
+    "resolution_status": "active"
+  }]
+}
+~~~
+
+This data joins the same multi-source compilation and 7+2 review pipeline. **Bridge entries are classified as inference, never as independently verified fact**: the original provider cannot be rechecked by Facetide, and the host must republish revisions or retractions. Native adapters remain preferable for verifiable source lifecycles. Disabling the allowlist prevents new processes from reading cached bridge projections, but does not delete the local database.

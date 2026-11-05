@@ -29,6 +29,21 @@ def facetide_prepare_review(period_start: str, period_end: str) -> dict:
 
 
 @mcp.tool()
+def facetide_publish_source_bundle(records: list[dict]) -> dict:
+    """Opt-in generic ingestion of provider-scoped summaries by a host Agent.
+
+    Each item: {provider, source_ref, occurred_at, known_at?, domain_ids?,
+    resolution_status?, change?, summary}. provider MUST be configured in the
+    FACETIDE_BRIDGE_ALLOWED_SOURCES environment allowlist. source_ref is the
+    provider's real stable native ID, not an invented hash. This is a *provisional
+    source-referenced projection*, never independently verified and never a user
+    satisfaction score. Revisions/retractions must be republished by the host.
+    Never ingest raw transcripts, passwords or full clinical records.
+    """
+    return LifeStore().publish_source_bundle(records)
+
+
+@mcp.tool()
 def facetide_get_compilation_batch(
     period_start: str, period_end: str, offset: int = 0, limit: int = 25,
 ) -> dict:

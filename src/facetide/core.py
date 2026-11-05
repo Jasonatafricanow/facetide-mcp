@@ -10,7 +10,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .sources import EmptySource, EvidenceSource, JsonlSource
+from .sources import EmptySource, EvidenceSource, JsonlSource, HostBridgeSource, normalize_evidence
 from .adapters import CompositeSource, MrMemAmlSource, NutritionMcpSource
 
 DOMAINS = {
@@ -102,6 +102,10 @@ class LifeStore:
             evidence_file = os.environ.get("FACETIDE_EVIDENCE_FILE")
             if evidence_file:
                 sources.append(JsonlSource(evidence_file))
+            # New provider types need no native adapter. A configured source
+            # allowlist is explicit opt-in to temporary host projections.
+            if os.environ.get("FACETIDE_BRIDGE_ALLOWED_SOURCES", "").strip():
+                sources.append(HostBridgeSource(self.path))
             self.source = CompositeSource(sources) if sources else EmptySource()
         self._initialize()
 
@@ -162,6 +166,13 @@ class LifeStore:
                     reason TEXT NOT NULL,
                     compiled_at TEXT NOT NULL,
                     PRIMARY KEY (source_type, source_ref)
+                );
+                CREATE TABLE IF NOT EXISTS host_bridge_evidence (
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    imported_at TEXT NOT NULL,
+                    PRIMARY KEY(source_type, source_ref)
                 );
                 CREATE TABLE IF NOT EXISTS compiled_axes (
                     period_start TEXT NOT NULL,
@@ -275,6 +286,65 @@ class LifeStore:
 
     def _evidence(self, start: str, end: str) -> tuple[list[dict], list[str]]:
         return self.source.query(start, end, DOMAIN_IDS)
+
+    def publish_source_bundle(self, records: list[dict]) -> dict:
+        """Accept bounded host-Agent source references from configured providers.
+
+        This is only a source-referenced projection cache. No unverified record
+        is silently upgraded into a verified measurement or user statement.
+        """
+        import re
+        allowed = {s.strip().lower() for s in os.environ.get(
+            "FACETIDE_BRIDGE_ALLOWED_SOURCES", "").split(",") if s.strip()}
+        if not allowed:
+            raise ValidationError("Host source bridge disabled; configure explicit allowed providers")
+        if not isinstance(records, list) or not 1 <= len(records) <= 100:
+            raise ValidationError("records must contain 1..100 source observations")
+        checked = []
+        for row in records:
+            if not isinstance(row, dict):
+                raise ValidationError("Each record must be an object")
+            provider = row.get("provider")
+            if not isinstance(provider, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{1,39}", provider):
+                raise ValidationError("Invalid provider name")
+            if provider not in allowed:
+                raise ValidationError(f"Provider '{provider}' is not allowlisted")
+            source_ref = row.get("source_ref")
+            if not isinstance(source_ref, str) or not source_ref.strip():
+                raise ValidationError("Missing native provider record ID")
+            payload = {
+                "source_type": "bridge:" + provider,
+                "source_ref": source_ref,
+                "occurred_at": row.get("occurred_at"),
+                "known_at": row.get("known_at"),
+                "domain_ids": row.get("domain_ids", []),
+                # This is host-asserted provenance, not a direct provider read.
+                "evidence_kind": "inference",
+                "resolution_status": row.get("resolution_status", "active"),
+                "change": row.get("change"),
+                "summary": row.get("summary", ""),
+            }
+            normalized = normalize_evidence(payload, DOMAIN_IDS)
+            checked.append(normalized)
+        # Atomic update; source revisions invalidate dependent compilation
+        # automatically because the source record's content hash changes.
+        timestamp = _utc_now()
+        with self._connection() as db:
+            for item in checked:
+                db.execute(
+                    """INSERT INTO host_bridge_evidence(
+                        source_type, source_ref, payload_json, imported_at
+                    ) VALUES(?,?,?,?)
+                    ON CONFLICT(source_type, source_ref) DO UPDATE
+                    SET payload_json=excluded.payload_json, imported_at=excluded.imported_at""",
+                    (item["source_type"], item["source_ref"], _json(item), timestamp),
+                )
+        return {
+            "accepted": len(checked),
+            "providers": sorted({item["source_type"][7:] for item in checked}),
+            "verification": "host_attested_only",
+            "note": "Facetide cannot revalidate original provider contents; revisions must be republished.",
+        }
 
     def get_compilation_batch(self, period_start: str, period_end: str,
                               offset: int = 0, limit: int = 25) -> dict:

@@ -25,6 +25,16 @@ See [Semantic Assembly](docs/semantic-assembly.md) for the source-backed cross-d
 
 The compiler is a rebuildable materialized projection with source hash validation. It never changes canonical MR-Mem, never promotes agent-generated narratives into user statements, and never auto-scores. The local Web UI alone cannot semantically compile records: the host Agent must trigger the MCP workflow.
 
+### Other MCP sources (opt-in generic bridge)
+
+To include future providers without writing a new native adapter, configure an explicit allowlist:
+
+~~~sh
+export FACETIDE_BRIDGE_ALLOWED_SOURCES=calendar,github
+~~~
+
+A host Agent can query these other MCP providers and forward **only a compact observation with a real original provider record ID, occurred/known times, and optional domain tags** to `facetide_publish_source_bundle`. The bridge stores revisable source-referenced projections, not full provider data. It is disabled by default. **The host-attested observations are not independently verified by Facetide**, and revisions/deletions must be republished by the host. Do not send full transcripts, clinical records, credentials, or secrets.
+
 ## MVP status
 
 - Seven life domains with optional **user-owned 1–5 ratings**.
@@ -33,7 +43,7 @@ The compiler is a rebuildable materialized projection with source hash validatio
 - A goal can support multiple life domains.
 - Immutable confirmed review snapshots (including goal versions), append-only corrections, score history.
 - Read-only **JSONL evidence adapter** with source references, separate occurred/known timestamps, explicit retraction, and cross-domain links.
-- Seven stdio MCP tools (including a two-stage semantic compiler) plus reflection prompt, local workbench, SQLite persistence, no telemetry.
+- Eight stdio MCP tools (including a two-stage semantic compiler and optional host source bridge) plus reflection prompt, local workbench, SQLite persistence, no telemetry.
 
 This is a runnable single-user core and local workbench. Narrow MR-Mem **AML** and Nutrition-Tracker-MCP **recent 7/30-day report** read-only adapters are implemented against their published contracts. Broader historical integrations and live NAS verification remain outstanding.
 
@@ -80,6 +90,7 @@ The evidence file environment variable is optional. Without it, Facetide still s
 | MCP tool | Operation |
 | --- | --- |
 | \`facetide_get_snapshot\` | Seven domains, latest ratings, goals and status |
+| \`facetide_publish_source_bundle\` | Optional host-bridged source projections from allowed providers |
 | \`facetide_get_compilation_batch\` | Read bounded multi-source records for host Agent classification |
 | \`facetide_compile_batch\` | Persist source-verified provisional 7+2 mappings and narrative proposals |
 | \`facetide_prepare_review\` | Time-bounded evidence + previous snapshot + candidate changes |
