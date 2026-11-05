@@ -17,7 +17,7 @@ and distinguish what the user said from the Agent's hypothesis.
 
 ## Mandatory Agent interaction
 
-1. Call `facetide_agent_brief(start,end)`. It returns the user's prior confirmed
+1. Call `facetide_context(start,end)`. It returns the user's prior confirmed
    review, existing goals and the *machine-readable handoff schema*.
 2. Call the upstream tools **as the host Agent**. If StateBar is connected,
    use real documented MCP tools and a known scoped `subject_id`:
@@ -31,11 +31,11 @@ and distinguish what the user said from the Agent's hypothesis.
    are actually available. Never invent an uncalled source or provider ID.
 4. The LLM reasons over facts, explicit preferences, goals and costs. Submit
    exactly seven domain records and two narrative axes using
-   `facetide_stage_agent_review`. The output is a *draft*, not user truth.
+   `facetide_draft`. The output is a *draft*, not user truth.
 5. Show the proposed observation and its attribution to the user. Ask only
    about material uncertainty. Solicit 1–5 satisfaction ratings for whichever
    domains the user wants to rate; allow omissions.
-6. Call `facetide_confirm_agent_review` only after the user approves the
+6. Call `facetide_confirm` only after the user approves the
    exact draft, any narrative edits and the ratings. Preserve the immutable
    draft linkage and confirmed review.
 
@@ -114,10 +114,10 @@ axis receives a numerical score.
 
 ## Ratings and immutability
 
-`facetide_stage_agent_review` never accepts or writes subjective satisfaction
+`facetide_draft` never accepts or writes subjective satisfaction
 ratings. It returns an immutable draft_id and draft_hash.
 
-`facetide_confirm_agent_review` requires the draft ID/hash and explicit
+`facetide_confirm` requires the draft ID/hash and explicit
 user confirmation, accepts their own optional 1–5 scores and narrative
 corrections, writes a confirmed review, and links the approved draft.
 Changing an Agent's interpretation produces a new draft, not a silent
@@ -134,3 +134,21 @@ overwrite of the old one.
   arbitrary-period transition query; longitudinal data must come from
   other available sources or explicitly indicate unknown.
 - Real multi-MCP production evaluation is still required.
+
+
+## Compact tool discovery (v0.5.1)
+
+Normal `facetide-mcp` exposes only `facetide_context`, `facetide_draft`,
+and `facetide_confirm`. The full normative contract is delivered by the
+context tool or via the `facetide_reflection_guide` prompt when needed; it
+does not inflate every tool description.
+
+For controlled migration, set `FACETIDE_TOOL_PROFILE=legacy` to expose old
+tool names in addition to the three new ones. Goal writes from chat can
+be enabled with `FACETIDE_ENABLE_GOAL_TOOL=1`, while the browser retains
+its existing goal editor regardless of MCP tool profile.
+
+**Note:** This is a tool-selection improvement, not the replacement of one
+huge tool schema with a single universal `action` argument. Semantic source
+gathering remains the host LLM's job and source-backed 7+2 validation happens
+only at the draft boundary.
