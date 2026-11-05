@@ -7,12 +7,18 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install
         run: python -m pip install -e .
       - name: Run regression tests
@@ -21,5 +27,7 @@ jobs:
         run: python -c "from facetide.server import mcp; print(mcp.name)"
       - name: Check workbench JavaScript
         run: node --check src/facetide/static/app.js
-      - name: Verify wheel includes UI assets
+      - name: Test workbench state transitions
+        run: node --test tests/test_workbench.cjs
+      - name: Verify installed UI assets
         run: python -c "from importlib.resources import files; assert files('facetide').joinpath('static', 'index.html').is_file()"

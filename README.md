@@ -25,7 +25,7 @@ The core Agent workflow is exposed with three tools, not the old fifteen:
 
 | Tool | When to use |
 | --- | --- |
-| `facetide_context(period_start,period_end,history_limit=0)` | Start/resume a period. Returns protocol, goals, earlier user assessments, latest staged draft, optional short review history |
+| `facetide_context(period_start,period_end,history_limit=0)` | Start/resume a period. Returns protocol, goals, earlier user assessments, latest staged draft, current-period confirmed review with its frozen 7+2 draft, optional review history |
 | `facetide_draft(period_start,period_end,evidence,domains,axes)` | After the **host LLM** reads StateBar/MR-MEM/other data and interprets what it means to the user, stage exactly 7+2 sourced observations |
 | `facetide_confirm(draft_id,expected_hash,domain_scores,user_confirmed)` | Only after explicit user approval, freeze their ratings and narrative against the exact draft |
 
@@ -80,15 +80,15 @@ The optional host Agent can now compile a **whole-period state** after source cl
 
 State reports are **append-only model proposals**, not user evaluation; their cited sources are rechecked at read time and stale reports are explicitly flagged. The browser review now displays these higher-level state summaries above individual evidence, while satisfaction ratings remain user-only. For details, see [Longitudinal State Contract](docs/longitudinal-state.md).
 
-## The actual 7+2 data pipeline
+## Legacy optional semantic compilation
 
-See [Semantic Assembly](docs/semantic-assembly.md) for the source-backed cross-domain compilation loop. Connect the MCP server to an existing conversational Agent and invoke its `facetide_reflection_guide` prompt. The host Agent calls `facetide_get_compilation_batch`, interprets each item semantically (including irrelevant ones), calls `facetide_compile_batch`, and then queries `facetide_prepare_review`. This creates seven populated evidence cards and two editable, cited narrative axes. **Users only need to assess their own satisfaction scores and final judgment.**
+Requires `FACETIDE_TOOL_PROFILE=legacy`. See [Semantic Assembly](docs/semantic-assembly.md) for the source-backed cross-domain compilation loop. Connect the MCP server to an existing conversational Agent and explicitly request the legacy compilation workflow. The default reflection prompt uses the three-tool handoff. In legacy mode the host Agent calls `facetide_get_compilation_batch`, interprets each item semantically (including irrelevant ones), calls `facetide_compile_batch`, and then queries `facetide_prepare_review`. This creates seven populated evidence cards and two editable, cited narrative axes. **Users only need to assess their own satisfaction scores and final judgment.**
 
 The compiler is a rebuildable materialized projection with source hash validation. It never changes canonical MR-Mem, never promotes agent-generated narratives into user statements, and never auto-scores. The local Web UI alone cannot semantically compile records: the host Agent must trigger the MCP workflow.
 
-### Other MCP sources (opt-in generic bridge)
+### Legacy host source bridge (opt-in)
 
-To include future providers without writing a new native adapter, configure an explicit allowlist:
+For the legacy bridge tool, enable `FACETIDE_TOOL_PROFILE=legacy` and configure an explicit allowlist. The default handoff instead accepts host-supplied evidence directly in `facetide_draft`:
 
 ~~~sh
 export FACETIDE_BRIDGE_ALLOWED_SOURCES=calendar,github
@@ -104,7 +104,7 @@ A host Agent can query these other MCP providers and forward **only a compact ob
 - A goal can support multiple life domains.
 - Immutable confirmed review snapshots (including goal versions), append-only corrections, score history.
 - Read-only **JSONL evidence adapter** with source references, separate occurred/known timestamps, explicit retraction, and cross-domain links.
-- Eight stdio MCP tools (including a two-stage semantic compiler and optional host source bridge) plus reflection prompt, local workbench, SQLite persistence, no telemetry.
+- Three default stdio MCP tools, optional goal-edit tool, opt-in legacy tools, reflection prompt, local workbench, SQLite persistence, no telemetry.
 
 This is a runnable single-user core and local workbench. Narrow MR-Mem **AML** and Nutrition-Tracker-MCP **recent 7/30-day report** read-only adapters are implemented against their published contracts. Broader historical integrations and live NAS verification remain outstanding.
 
@@ -146,7 +146,9 @@ Example MCP host configuration (replace the executable path for your environment
 
 The evidence file environment variable is optional. Without it, Facetide still supports scores, goals, and manual review notes. The database defaults to \`~/.local/share/facetide/facetide.sqlite3\` (or the platform's \`XDG_DATA_HOME\`).
 
-## Tools
+## Legacy tool reference
+
+The following compatibility tools require `FACETIDE_TOOL_PROFILE=legacy`; they are not the default workflow.
 
 | MCP tool | Operation |
 | --- | --- |
@@ -161,16 +163,17 @@ The evidence file environment variable is optional. Without it, Facetide still s
 
 Input dates are inclusive \`YYYY-MM-DD\`. Omit unscored domains rather than guessing a value. Every write requires \`user_confirmed=true\` and actual user approval in the calling Agent. The flag is an application contract, not proof of consent.
 
-### First review
+## First review (default profile)
 
-1. Use \`facetide_get_snapshot\` to see currently rated domains.
-2. Discuss seven life domains, but allow the user to rate just a subset.
-3. If the user wants a goal, define its **enough condition** and associate one or more domains before \`facetide_upsert_goal\`.
-4. Use \`facetide_prepare_review\` for the desired date interval.
-5. Summarize only evidence with its source; treat uncertain/inferred entries as uncertain. Ask for the user's score and interpretation.
-6. Call \`facetide_save_review\` only after the user confirms. Query \`facetide_get_history\` for comparison next time.
+1. Call `facetide_context(period_start, period_end)` to read the schema, goals and prior confirmed review.
+2. The host Agent reads its connected upstream tools and stages a sourced 7+2 interpretation with `facetide_draft`.
+3. Present the draft and attribution to the user; only the user supplies optional satisfaction ratings.
+4. After explicit approval, call `facetide_confirm` with the exact draft ID and hash.
+5. Resume with `facetide_context` for the same period: `confirmed_review.approved_draft` is the frozen interpretation; `latest_draft` may be a newer, unapproved proposal. Use `history_limit=1..20` for additional confirmed reviews.
 
-For corrections, pass the earlier \`review_id\` as \`revision_of\` for the same period. Existing snapshots are never overwritten.
+Confirmed review narratives contain any user corrections. The linked `approved_draft` retains the original staged interpretation and host-attested provenance, not independently verified source truth. Earlier-period reviews and history also include their linked drafts. Manual legacy reviews have `approved_draft=null`.
+
+For corrections, pass the earlier `review_id` as `revision_of` for the same period. Existing snapshots are never overwritten. Goal editing is available in the workbench or through the opt-in goal tool.
 
 ## Read-only evidence bridge
 

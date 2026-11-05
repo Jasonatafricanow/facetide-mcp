@@ -330,7 +330,7 @@ def facetide_reflection_guide(period: str = "this month") -> str:
     """Three-tool 7+2 workflow, with source interpretation owned by the LLM."""
     return (
         f"Organize a Facetide life reflection for {period}. "
-        "1. Call facetide_context(start,end) for the seven domain/two axis "
+        "1. Call facetide_context(period_start,period_end) for the seven domain/two axis "
         "contract, prior user assessments and goals. "
         "2. YOU, the host LLM, call the existing connected StateBar tools "
         "user_state.snapshot/get_state/context_candidates using a known "
