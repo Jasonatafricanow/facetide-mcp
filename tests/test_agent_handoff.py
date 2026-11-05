@@ -1,5 +1,6 @@
 """Host LLM handoff contract tests: evidence, attribution and user approval."""
 import tempfile
+import sqlite3
 import unittest
 from pathlib import Path
 
@@ -138,6 +139,35 @@ class AgentHandoffTests(unittest.TestCase):
         self.assertNotEqual(first["draft_id"], second["draft_id"])
         with self.store._connection() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM agent_handoff_drafts").fetchone()[0], 2)
+
+    def test_confirmed_history_survives_a_new_unapproved_draft(self):
+        first = self.store.stage_agent_review(**payload())
+        saved = self.store.confirm_agent_review(
+            draft_id=first["draft_id"], expected_hash=first["draft_hash"],
+            domain_scores={"career": 3}, user_confirmed=True)
+        second = self.store.stage_agent_review(**payload())
+        for review in (saved["review"], self.store.get_history()["reviews"][0],
+                       self.store.get_snapshot()["latest_review"],
+                       self.store.get_period_review("2026-11-01", "2026-11-05"),
+                       self.store.agent_brief("2026-12-01", "2026-12-31")["previous_user_review"]):
+            approved = review["approved_draft"]
+            self.assertEqual(approved["draft_id"], first["draft_id"])
+            self.assertEqual(len(approved["domains"]), 7)
+            self.assertEqual(len(approved["evidence"]), 2)
+            self.assertEqual(approved["verification"], "host_attested")
+        self.assertEqual(self.store.get_agent_review("2026-11-01", "2026-11-05")
+                         ["draft"]["draft_id"], second["draft_id"])
+
+    def test_link_failure_rolls_back_confirmed_review(self):
+        staged = self.store.stage_agent_review(**payload())
+        with self.store._connection() as db:
+            db.execute("""CREATE TRIGGER fail_link BEFORE INSERT ON agent_review_links
+                          BEGIN SELECT RAISE(ABORT, 'injected link failure'); END""")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.confirm_agent_review(
+                draft_id=staged["draft_id"], expected_hash=staged["draft_hash"],
+                domain_scores={"career": 3}, user_confirmed=True)
+        self.assertEqual(self.store.get_history()["total"], 0)
 
 
 if __name__ == "__main__":

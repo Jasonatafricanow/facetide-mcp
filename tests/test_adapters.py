@@ -1,4 +1,5 @@
 """Real MR-Mem AML schema read test using synthetic scoped stores."""
+from contextlib import closing
 import hashlib
 import json
 import sqlite3
@@ -15,16 +16,16 @@ class AdapterTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        with sqlite3.connect(self.root / "memory.sqlite") as db:
+        with closing(sqlite3.connect(self.root / "memory.sqlite")) as db, db:
             db.execute("CREATE TABLE canonical_memory (payload TEXT NOT NULL)")
-        with sqlite3.connect(self.root / "aml_source.sqlite") as db:
+        with closing(sqlite3.connect(self.root / "aml_source.sqlite")) as db, db:
             db.execute("CREATE TABLE messages (record_id TEXT,user_id TEXT,session_id TEXT, "
                        "occurred_at TEXT,time_given INTEGER,fingerprint TEXT,content TEXT)")
         self.content = "A user said they want steadier sleep"
         self.fingerprint = hashlib.sha256(self.content.encode()).hexdigest()
 
     def insert(self, mid, user="alice", lifecycle="active", day="2026-10-09", valid=True):
-        with sqlite3.connect(self.root / "aml_source.sqlite") as db:
+        with closing(sqlite3.connect(self.root / "aml_source.sqlite")) as db, db:
             db.execute("INSERT INTO messages VALUES (?,?,?,?,?,?,?)",
                        (mid, user, "thread-1", day, 1,
                         self.fingerprint if valid else "f" * 64, self.content))
@@ -38,7 +39,7 @@ class AdapterTests(unittest.TestCase):
             }]},
             "attributes": [["facetide_domains", ["health", "leisure"]]]
         }
-        with sqlite3.connect(self.root / "memory.sqlite") as db:
+        with closing(sqlite3.connect(self.root / "memory.sqlite")) as db, db:
             db.execute("INSERT INTO canonical_memory(payload) VALUES (?)", (json.dumps(mem),))
 
     def test_scope_version_time_and_lifecycle(self):

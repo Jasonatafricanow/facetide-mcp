@@ -17,7 +17,7 @@ and distinguish what the user said from the Agent's hypothesis.
 
 ## Mandatory Agent interaction
 
-1. Call `facetide_context(start,end)`. It returns the user's prior confirmed
+1. Call `facetide_context(period_start,period_end)`. It returns the user's prior confirmed
    review, existing goals and the *machine-readable handoff schema*.
 2. Call the upstream tools **as the host Agent**. If StateBar is connected,
    use real documented MCP tools and a known scoped `subject_id`:
@@ -152,3 +152,7 @@ its existing goal editor regardless of MCP tool profile.
 huge tool schema with a single universal `action` argument. Semantic source
 gathering remains the host LLM's job and source-backed 7+2 validation happens
 only at the draft boundary.
+
+## Resuming confirmed reviews
+
+`facetide_context` returns `confirmed_review` for the exact requested period, separately from `latest_draft`. Confirmed reviews include `approved_draft` with the frozen domains, axes, evidence and hash. The same linked draft is returned in prior reviews and optional history. Preserve the review-level narrative corrections and do not substitute a newer unapproved draft. Legacy manual reviews have no linked draft.

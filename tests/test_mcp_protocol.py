@@ -1,5 +1,6 @@
 """Real stdio MCP discovery tests: compact-by-default, opt-in legacy exposure."""
 import asyncio
+import json
 import os
 import sys
 import tempfile
@@ -8,6 +9,7 @@ from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from test_agent_handoff import payload
 
 COMPACT = {"facetide_context", "facetide_draft", "facetide_confirm"}
 OLD = {
@@ -19,6 +21,12 @@ OLD = {
     "facetide_get_state_report", "facetide_upsert_goal", "facetide_save_review",
     "facetide_get_history",
 }
+
+
+def tool_payload(result):
+    if result.structuredContent is not None:
+        return result.structuredContent
+    return json.loads(next(part.text for part in result.content if part.type == "text"))
 
 
 class MCPProtocolTest(unittest.TestCase):
@@ -51,6 +59,29 @@ class MCPProtocolTest(unittest.TestCase):
                 })
                 self.assertFalse(result.isError)
                 self.assertTrue(result.structuredContent or result.content)
+                if profile == "compact" and not enable_goal:
+                    staged = await session.call_tool("facetide_draft", payload())
+                    self.assertFalse(staged.isError)
+                    draft = tool_payload(staged)
+                    confirmed = await session.call_tool("facetide_confirm", {
+                        "draft_id": draft["draft_id"], "expected_hash": draft["draft_hash"],
+                        "domain_scores": {"career": 3}, "user_confirmed": True,
+                    })
+                    self.assertFalse(confirmed.isError)
+                    newer = await session.call_tool("facetide_draft", payload())
+                    self.assertFalse(newer.isError)
+                    resumed = await session.call_tool("facetide_context", {
+                        "period_start": "2026-11-01", "period_end": "2026-11-05",
+                        "history_limit": 1,
+                    })
+                    self.assertFalse(resumed.isError)
+                    context = tool_payload(resumed)
+                    self.assertEqual(context["confirmed_review"]["approved_draft"]["draft_id"],
+                                     draft["draft_id"])
+                    self.assertEqual(context["latest_draft"]["draft_id"],
+                                     tool_payload(newer)["draft_id"])
+                    self.assertEqual(context["history"]["reviews"][0]["approved_draft"]
+                                     ["draft_id"], draft["draft_id"])
                 self.assertIn("facetide_reflection_guide",
                               {p.name for p in (await session.list_prompts()).prompts})
 

@@ -7,6 +7,7 @@ Raw chat transcripts and health metrics never enter Facetide's database.
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from datetime import date, datetime
 from pathlib import Path
 from typing import Protocol
@@ -117,7 +118,7 @@ class HostBridgeSource:
     def query(self, period_start, period_end, domains):
         import sqlite3
         result, warnings = [], []
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             rows = db.execute("SELECT payload_json FROM host_bridge_evidence").fetchall()
         for (raw,) in rows:
             try:

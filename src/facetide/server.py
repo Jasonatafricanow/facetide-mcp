@@ -46,6 +46,7 @@ def facetide_context(period_start: str, period_end: str, history_limit: int = 0)
     store = LifeStore()
     result = store.agent_brief(period_start, period_end)
     result["latest_draft"] = store.get_agent_review(period_start, period_end)["draft"]
+    result["confirmed_review"] = store.get_period_review(period_start, period_end)
     if history_limit:
         result["history"] = store.get_history(limit=history_limit)
     return result
@@ -329,7 +330,7 @@ def facetide_reflection_guide(period: str = "this month") -> str:
     """Three-tool 7+2 workflow, with source interpretation owned by the LLM."""
     return (
         f"Organize a Facetide life reflection for {period}. "
-        "1. Call facetide_context(start,end) for the seven domain/two axis "
+        "1. Call facetide_context(period_start,period_end) for the seven domain/two axis "
         "contract, prior user assessments and goals. "
         "2. YOU, the host LLM, call the existing connected StateBar tools "
         "user_state.snapshot/get_state/context_candidates using a known "

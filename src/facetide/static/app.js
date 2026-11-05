@@ -192,17 +192,28 @@ async function loadContext(){
   const start=$('startDate').value,end=$('endDate').value;
   if(!start||!end||start>end)throw Error('请选择有效的开始和结束日期');
   const ctx=await api('/api/context?'+new URLSearchParams({start,end}));
+  if(start!==$('startDate').value||end!==$('endDate').value)return null;
   state.ratings={};state.revisionOf=null;$('revisionNotice').hidden=true;$('reviewConfirm').checked=false;
   for(const id of ['growthInput','realizationInput','reviewNote'])$(id).value='';
   renderContext(ctx);
+  $('saveReview').disabled=false;
   if(state.snapshot)renderOverview();
   return ctx;
  }catch(e){toast(e.message,true);return null}
 }
 const lines=id=>$(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+function invalidateReviewPeriod(){
+ state.context=null;state.revisionOf=null;state.ratings={};
+ $('reviewConfirm').checked=false;$('saveReview').disabled=true;
+ $('revisionNotice').hidden=true;
+ $('stateReport').textContent='观察区间已变化，请重新提取变化证据后再确认。';
+}
 async function saveReview(){
  if(!$('reviewConfirm').checked){toast('请先确认评分和解释由本人认可。',true);return}
  if(!state.context){toast('请先读取复盘区间。',true);return}
+ if(state.context.period_start!==$('startDate').value||state.context.period_end!==$('endDate').value){
+  invalidateReviewPeriod();toast('观察区间已变化，请重新提取变化证据。',true);return;
+ }
  const refs=Array.from(document.querySelectorAll('#evidenceList input:checked')).map(el=>{
   const e=state.context.evidence[Number(el.dataset.evidence)];
   return {source_type:e.source_type,source_ref:e.source_ref};
@@ -301,7 +312,8 @@ function renderHistory(){
  ${r.personal_growth?`<blockquote>成长：${escapeHtml(r.personal_growth)}</blockquote>`:''}
  ${r.self_realization?`<blockquote>实现：${escapeHtml(r.self_realization)}</blockquote>`:''}
  ${r.user_notes?`<blockquote>${escapeHtml(r.user_notes)}</blockquote>`:''}
- <div class="card-foot"><small class="soft">${escapeHtml(r.confirmed_at.slice(0,10))} · ${r.evidence_refs.length} 条来源引用</small><button data-revise="${escapeHtml(r.review_id)}">修订这份快照（保留原版）</button></div>
+ ${r.approved_draft?`<details><summary>已确认的七领域解释与来源</summary>${r.approved_draft.domains.map(d=>`<p><b>${escapeHtml(dname(d.domain_id))}</b>：${escapeHtml(d.observation||'未知')}<br>${escapeHtml(d.meaning.why)}<small> · ${escapeHtml(d.meaning.basis)} · 引用 ${escapeHtml(d.evidence_refs.join('、'))}</small></p>`).join('')}${r.approved_draft.evidence.map(e=>`<p>${escapeHtml(e.summary)}<small> · ${escapeHtml(e.evidence_id)} · ${escapeHtml(e.provider)} / ${escapeHtml(e.source_ref)} · 来源由宿主提供，未独立核验</small></p>`).join('')}</details>`:''}
+ <div class="card-foot"><small class="soft">${escapeHtml(r.confirmed_at.slice(0,10))} · ${r.approved_draft?.evidence.length??r.evidence_refs.length} 条来源引用</small><button data-revise="${escapeHtml(r.review_id)}">修订这份快照（保留原版）</button></div>
  </article>`).join(''):'<div class="empty">没有历史快照。完成第一次复盘后，这里会保留真实轨迹。</div>';
  document.querySelectorAll('[data-revise]').forEach(el=>el.addEventListener('click',()=>correctReview(el.dataset.revise)));
 }
@@ -309,6 +321,10 @@ async function correctReview(id){
  const r=state.history.find(item=>item.review_id===id);if(!r)return;
  $('startDate').value=r.period_start;$('endDate').value=r.period_end;
  if(!await loadContext())return;
+ // Revise the frozen interpretation, never a newer unapproved proposal.
+ state.context.agent_handoff={draft:r.approved_draft||null};
+ renderContext(state.context);
+ if(r.approved_draft)$('stateReport').insertAdjacentHTML('afterbegin','<p>正在修订已确认快照；保存需要再次确认。</p>');
  state.revisionOf=r.review_id;state.ratings={...r.domain_scores};refreshRatingState();
  $('growthInput').value=r.personal_growth;$('realizationInput').value=r.self_realization;$('reviewNote').value=r.user_notes;
  ['new','stable','receding'].forEach((name,i)=>$( ['changeNew','changeStable','changeReceding'][i]).value=(r.change_band[name]||[]).join('\n'));
@@ -337,6 +353,7 @@ async function init(){
   document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.page)));
   document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.go)));
   $('loadContext').addEventListener('click',loadContext);
+  for(const id of ['startDate','endDate'])$(id).addEventListener('input',invalidateReviewPeriod);
   $('saveReview').addEventListener('click',saveReview);
   $('goalForm').addEventListener('submit',saveGoal);
   $('resetGoal').addEventListener('click',resetGoal);
