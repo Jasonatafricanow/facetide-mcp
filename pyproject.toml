@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "facetide-mcp"
+version = "0.1.0"
+description = "Local-first personal life review and evidence projection MCP server"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["mcp>=1.28,<2"]
+
+[project.scripts]
+facetide-mcp = "facetide.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/facetide"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
