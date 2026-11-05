@@ -1,0 +1,2 @@
+{"source_type":"memory","source_ref":"demo-event-001","occurred_at":"2026-10-14","known_at":"2026-10-15T09:00:00+00:00","domain_ids":["health","leisure"],"evidence_kind":"user_statement","resolution_status":"active","change":"new","summary":"Example: reported a better sleep schedule"}
+{"source_type":"nutrition","source_ref":"demo-metric-002","occurred_at":"2026-10-22","known_at":"2026-10-22","domain_ids":["health"],"evidence_kind":"fact","resolution_status":"active","change":"stable","summary":"Example: an existing nutrition metric remained in its target range"}
