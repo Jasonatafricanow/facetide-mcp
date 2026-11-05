@@ -55,6 +55,8 @@ class AgentHandoffTests(unittest.TestCase):
         self.assertEqual(result["protocol"], "facetide.agent_handoff.v1")
         self.assertEqual(len(result["domains"]), 7)
         self.assertIn("user_state.get_state", result["source_tools"]["statebar"])
+        self.assertEqual(result["schema"]["title"], "Facetide Agent Handoff v1")
+        self.assertEqual(result["schema"]["properties"]["domains"]["minItems"], 7)
 
     def test_full_draft_integrity_and_unscored_7plus2(self):
         result = self.store.stage_agent_review(**payload())

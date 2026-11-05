@@ -13,6 +13,7 @@ import json
 import uuid
 
 from .core import DOMAINS, ValidationError, _period, _utc_now
+from .contract import HANDOFF_SCHEMA
 
 AXES = ("personal_growth", "self_realization")
 COVERAGE = {"observed", "partial", "unknown"}
@@ -46,7 +47,7 @@ def _date(value, label):
 def _refs(refs, sources, label):
     if not isinstance(refs, list) or len(refs) > MAX_EVIDENCE:
         raise ValidationError(f"{label} must be a list of at most {MAX_EVIDENCE} refs")
-    if len(set(refs)) != len(refs) or any(not isinstance(x, str) or x not in sources for x in refs):
+    if any(not isinstance(x, str) or x not in sources for x in refs) or len(set(refs)) != len(refs):
         raise ValidationError(f"{label} must reference unique evidence IDs from the handoff")
     return list(refs)
 
@@ -202,6 +203,7 @@ class AgentHandoff:
             "period_start": period_start, "period_end": period_end,
             "previous_user_review": latest, "user_goals": goals,
             "domains": list(DOMAINS), "axes": list(AXES),
+            "schema": HANDOFF_SCHEMA,
             "source_tools": {
                 "statebar": ["user_state.snapshot", "user_state.get_state",
                              "user_state.context_candidates"],
