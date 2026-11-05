@@ -120,6 +120,16 @@ class AgentHandoffTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.store.stage_agent_review(**body)
 
+    def test_invalid_timestamp_and_refs_fail_cleanly(self):
+        wrong = payload()
+        wrong["evidence"][0]["occurred_at"] = "2026-11-03junk"
+        with self.assertRaises(ValidationError):
+            self.store.stage_agent_review(**wrong)
+        wrong = payload()
+        wrong["domains"][0]["evidence_refs"] = [{}]
+        with self.assertRaises(ValidationError):
+            self.store.stage_agent_review(**wrong)
+
     def test_staging_never_rewrites_draft_or_user_goals(self):
         first = self.store.stage_agent_review(**payload())
         second_payload = payload()

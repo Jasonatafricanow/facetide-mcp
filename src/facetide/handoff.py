@@ -41,6 +41,12 @@ def _date(value, label):
         raise ValidationError(f"Invalid {label}") from exc
     if value[:10] != parsed.isoformat():
         raise ValidationError(f"Invalid {label}")
+    if len(value) > 10:
+        from datetime import datetime
+        try:
+            datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValidationError(f"Invalid ISO timestamp for {label}") from exc
     return value
 
 

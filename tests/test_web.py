@@ -90,6 +90,45 @@ class WorkbenchTests(unittest.TestCase):
         history = json.loads(self.request("GET", "/api/history")[2])
         self.assertEqual(history["total"], 1)
 
+
+    def test_agent_handoff_can_be_confirmed_by_local_workbench(self):
+        domains = [
+            {"domain_id": name, "coverage": "unknown", "observation": "",
+             "evidence_refs": [], "direction": "unknown",
+             "meaning": {"assessment": "uncertain", "basis": "unknown",
+                         "why": "", "evidence_refs": []}}
+            for name in ("career", "finance", "health", "family", "social",
+                         "leisure", "environment")
+        ]
+        axes = [
+            {"axis": name, "status": "unknown", "narrative": "",
+             "evidence_refs": [], "basis": "unknown"}
+            for name in ("personal_growth", "self_realization")
+        ]
+        draft = self.server.store.stage_agent_review(
+            period_start="2026-11-01", period_end="2026-11-05",
+            evidence=[], domains=domains, axes=axes)
+        confirmation = {
+            "draft_id": draft["draft_id"], "expected_hash": draft["draft_hash"],
+            "domain_scores": {"health": 3}, "user_confirmed": True,
+        }
+        status, _, _ = self.request("POST", "/api/agent-confirm", confirmation,
+                                    {"Content-Type": "application/json"})
+        self.assertEqual(status, 403)
+        headers = {
+            "Content-Type": "application/json",
+            "X-Facetide-Token": self.server.token,
+            "Origin": f"http://127.0.0.1:{self.server.server_port}",
+        }
+        status, _, content = self.request("POST", "/api/agent-confirm", confirmation, headers)
+        self.assertEqual(status, 201)
+        body = json.loads(content)
+        self.assertEqual(body["approved_draft_id"], draft["draft_id"])
+        self.assertEqual(body["review"]["domain_scores"], {"health": 3})
+        context = json.loads(self.request(
+            "GET", "/api/context?start=2026-11-01&end=2026-11-05")[2])
+        self.assertEqual(context["agent_handoff"]["draft"]["draft_id"], draft["draft_id"])
+
     def test_context_query_is_read_only(self):
         status, _, body = self.request("GET", "/api/context?start=2026-11-01&end=2026-11-05")
         self.assertEqual(status, 200)
