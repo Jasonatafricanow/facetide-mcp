@@ -268,6 +268,8 @@ async function init(){
   $('resetGoal').addEventListener('click',resetGoal);
   $('cancelRevision').addEventListener('click',()=>{state.revisionOf=null;$('revisionNotice').hidden=true});
   await reload();
+  // Prefetch read-only evidence once; user scores and goals are never written here.
+  await loadContext();
  }catch(e){toast('无法连接本地服务：'+e.message,true)}
 }
 window.addEventListener('DOMContentLoaded',init);
