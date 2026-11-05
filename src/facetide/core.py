@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .sources import EmptySource, EvidenceSource, JsonlSource
+from .adapters import CompositeSource, MrMemAmlSource, NutritionMcpSource
 
 DOMAINS = {
     "career": "Work & career",
@@ -84,8 +85,24 @@ class LifeStore:
         default = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "facetide" / "facetide.sqlite3"
         self.path = Path(path or os.environ.get("FACETIDE_DB_PATH", str(default))).expanduser()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        evidence_file = os.environ.get("FACETIDE_EVIDENCE_FILE")
-        self.source: EvidenceSource = source or (JsonlSource(evidence_file) if evidence_file else EmptySource())
+        if source is not None:
+            self.source = source
+        else:
+            sources = []
+            mr_dir = os.environ.get("FACETIDE_MRMEM_DIR")
+            mr_user = os.environ.get("FACETIDE_MRMEM_USER_ID")
+            if bool(mr_dir) != bool(mr_user):
+                raise ValidationError("MR-Mem integration requires both FACETIDE_MRMEM_DIR and FACETIDE_MRMEM_USER_ID")
+            if mr_dir:
+                sources.append(MrMemAmlSource(mr_dir, mr_user))
+            nutrition_url = os.environ.get("FACETIDE_NUTRITION_MCP_URL")
+            if nutrition_url:
+                sources.append(NutritionMcpSource(
+                    nutrition_url, member_id=os.environ.get("FACETIDE_NUTRITION_MEMBER_ID")))
+            evidence_file = os.environ.get("FACETIDE_EVIDENCE_FILE")
+            if evidence_file:
+                sources.append(JsonlSource(evidence_file))
+            self.source = CompositeSource(sources) if sources else EmptySource()
         self._initialize()
 
     @contextmanager
@@ -200,6 +217,10 @@ class LifeStore:
             indicators = {}
         if not isinstance(indicators, dict) or any(x not in {"outcome", "driver", "guardrail"} for x in indicators):
             raise ValidationError("indicators accepts only outcome, driver and guardrail")
+        if any(not isinstance(value, list) or len(value) > 10
+               or any(not isinstance(item, str) or not item.strip() or len(item) > 200
+                      for item in value) for value in indicators.values()):
+            raise ValidationError("each indicator category must be a list of at most 10 nonempty strings (200 chars each)")
         encoded_indicators = _json(indicators)
         now = _utc_now()
         with self._connection() as db:

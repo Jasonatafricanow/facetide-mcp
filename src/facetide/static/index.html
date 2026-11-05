@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Facetide · 生活观察</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body><div class="layout">
+<aside class="sidebar"><div class="brand"><span class="brand-icon">◉</span><div><b>facetide</b><small>Life in perspective</small></div></div>
+<div class="section-label">个人观察空间</div><nav id="navigation">
+<button class="active" data-page="overview">◈　生活总览</button><button data-page="review">◫　周期复盘</button>
+<button data-page="goals">◎　目标与够了</button><button data-page="history">◷　历史轨迹</button></nav>
+<div class="sidebar-footer"><span class="online-dot"></span><div>仅本地运行<small id="sourceStatus">读取数据来源中</small></div></div></aside>
+<main class="main"><header class="topbar"><span id="breadcrumb">OVERVIEW / 生活总览</span><span>评价属于你 · 事实保留来源</span></header>
+<div class="content">
+<section class="page active" id="page-overview"><div class="hero"><div><div class="eyebrow">YOUR LIFE, IN PERSPECTIVE</div><h1>生活不是一张成绩单。</h1><p>看看不同生活领域此刻是什么样，以及它们如何发生变化。</p></div><button class="primary" data-go="review">开始复盘 ↗</button></div>
+<div class="overview">
+<article class="panel wheel-panel"><div class="panel-heading">生活轮廓 <span id="lastReview" class="soft">尚无评分</span></div><div id="wheel" class="wheel"></div><div class="wheel-legend">● 本人评分　 ○ 尚未评价</div></article>
+<div class="stack"><article class="panel highlight"><div class="eyebrow">WHERE YOU ARE</div><h2 id="quickSummary">开始记录自己的生活判断</h2><p>没有证据的生活领域保持未知，不自动计算幸福指数。</p></article>
+<article class="panel"><div class="panel-heading">中心两轴 <span class="pill">不打分</span></div>
+<div class="axis"><b>↘　个人成长</b><small>世界在我身上长出了什么？</small><p id="growthAxis">等待第一次复盘</p></div>
+<div class="axis"><b>↗　自我实现</b><small>我按自己的判断改变了哪里？</small><p id="realizationAxis">等待第一次复盘</p></div>
+</article></div></div>
+<div class="section-title"><div><div class="eyebrow">THE SEVEN DIMENSIONS</div><h2>七个生活领域</h2></div><span>没有一个领域需要永远向上。</span></div><div id="domainCards" class="domains"></div></section>
+<section class="page" id="page-review"><div class="hero"><div><div class="eyebrow">REFLECTION STUDIO</div><h1>把这段日子看清楚。</h1><p>先看发生了什么，再由你决定意味着什么。</p></div></div>
+<div class="review-layout"><div class="review-main">
+<article class="panel"><div class="panel-heading">01 / 选择观察区间 <span class="pill">按发生时间</span></div><div class="date-row"><label>开始日期<input type="date" id="startDate"></label><label>结束日期<input type="date" id="endDate"></label><button class="secondary" id="loadContext">提取变化证据</button></div><p class="soft">按需读取，不自动写入生活评分。</p></article>
+<article class="panel"><div class="panel-heading">02 / 这段时间发生了什么 <span class="pill" id="evidenceCount">尚未查询</span></div><div id="evidenceList" class="evidence-list"><div class="empty">提取现有记录，或者直接进行手动复盘。</div></div><div id="warnings" class="warning"></div></article>
+<article class="panel"><div class="panel-heading">03 / 本人满意度 <span class="pill">1—5 分，可留空</span></div><p class="soft">旧评分仅用于对照，不作为本次默认值。</p><div id="ratingRows"></div></article>
+<article class="panel"><div class="panel-heading">04 / 阶段变化与反思</div><div class="change-grid">
+<label>新变化<textarea id="changeNew" rows="3" placeholder="每行一项"></textarea></label><label>稳定的部分<textarea id="changeStable" rows="3" placeholder="每行一项"></textarea></label><label>退潮的部分<textarea id="changeReceding" rows="3" placeholder="每行一项"></textarea></label></div>
+<div class="two-col"><label>个人成长<textarea id="growthInput" rows="3" placeholder="世界如何改变了我"></textarea></label><label>自我实现<textarea id="realizationInput" rows="3" placeholder="我如何改变了世界"></textarea></label></div>
+<label>本人补充反思<textarea id="reviewNote" rows="3"></textarea></label>
+<div class="save-row"><label class="checkbox-row"><input type="checkbox" id="reviewConfirm"> 我确认以上评分和解释属于我自己的判断</label><button id="saveReview" class="primary">冻结本期快照</button></div><div id="revisionNotice" hidden>正在创建历史修订版，旧记录仍会保留。<button id="cancelRevision" class="text-button">取消修订</button></div>
+</article></div><aside class="panel previous"><div class="eyebrow">PREVIOUS SNAPSHOT</div><div id="previousSnapshot">先选择观察区间。</div><p>没有记录不等于退步。系统不负责定义你应该如何生活。</p></aside></div>
+</section>
+<section class="page" id="page-goals"><div class="hero"><div><div class="eyebrow">ENOUGH, NOT ENDLESS</div><h1>知道什么时候就够了。</h1><p>目标是生活的工具，不是绩效指标。</p></div></div>
+<div class="goals-layout"><article class="panel"><div class="panel-heading" id="goalFormTitle">设定一个真正重要的目标</div>
+<form id="goalForm"><label>目标是什么<input required id="goalTitle" maxlength="200" placeholder="例如：改善作息"></label>
+<label>达到什么程度算“够了”<textarea required id="goalEnough" maxlength="2000" rows="3" placeholder="用你自己的标准定义结束条件"></textarea></label>
+<div class="field-label">关联生活领域（可多选）</div><div id="goalDomains" class="chips"></div>
+<div class="indicator-fields">
+<label>结果指标（可选，每行一项）<textarea id="goalOutcome" rows="2" placeholder="如何判断够了"></textarea></label>
+<label>驱动指标（可选，每行一项）<textarea id="goalDriver" rows="2" placeholder="一两项真正有杠杆的动作"></textarea></label>
+<label>护栏指标（可选，每行一项）<textarea id="goalGuardrail" rows="2" placeholder="哪些生活不应因此受损"></textarea></label>
+</div>
+<label>目标状态<select id="goalStatus"><option value="building">建设：还未达到</option><option value="maintaining">维持：已经足够</option><option value="reflecting">反思：重新判断价值</option><option value="simplifying">精简：降低投入</option></select></label>
+<div class="save-row"><button type="button" id="resetGoal" class="secondary">取消编辑</button><button type="submit" class="primary">确认保存目标</button></div></form></article>
+<div><div class="section-title compact"><h2>当前目标</h2><span id="goalCount"></span></div><div id="goalList" class="goal-list"></div></div></div></section>
+<section class="page" id="page-history"><div class="hero"><div><div class="eyebrow">CONTINUITY & CHANGE</div><h1>看见自己走过的轨迹。</h1><p>历史评价属于当时的你，后来的修订不会删除过去。</p></div></div>
+<div class="panel trend-panel"><div class="panel-heading">领域评分轨迹 <span class="pill">仅本人评价</span></div><label>查看领域 <select id="trendDomain"></select></label><div id="trendChart" class="trend-chart"></div><p class="soft">未评价的阶段不填零、不做平滑或推断。修订期使用该期最新确认版本显示，原始版本仍保留在下方。</p></div>
+<div id="historyList" class="history-list"></div></section>
+</div><footer>FACETIDE · LOCAL FIRST · 观察不等于干预 · v<span id="appVersion">0.2.0</span></footer></main></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div></body></html>

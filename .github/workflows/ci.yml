@@ -19,3 +19,7 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Verify MCP server import
         run: python -c "from facetide.server import mcp; print(mcp.name)"
+      - name: Check workbench JavaScript
+        run: node --check src/facetide/static/app.js
+      - name: Verify wheel includes UI assets
+        run: python -c "from importlib.resources import files; assert files('facetide').joinpath('static', 'index.html').is_file()"

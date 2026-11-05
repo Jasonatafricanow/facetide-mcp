@@ -4,6 +4,21 @@
 
 Facetide does not calculate a happiness score, replace your memory system, or require daily check-ins. It organizes existing evidence for periodic reflection; only the user decides whether a domain is satisfying, what counts as enough, and whether a goal is worth continuing.
 
+## Current version: 0.2.0 — Agent core + browser workbench
+
+In addition to the MCP protocol, v0.2 includes a **local four-view workbench** with a seven-sector wheel, guided period reviews, selected evidence refs, goal lifecycle editor and immutable history.
+
+Start it separately from the MCP server:
+
+~~~sh
+facetide-web
+# local URL: http://127.0.0.1:8765
+~~~
+
+See [Product workbench and MR-Mem setup](docs/product-workbench.md). The UI and the MCP server share the same SQLite database and can run separately.
+
+**Optional native read-only MR-Mem AML adapter:** specify both `FACETIDE_MRMEM_DIR` and `FACETIDE_MRMEM_USER_ID`. It projects verified canonical memories from existing `memory.sqlite` and `aml_source.sqlite` with scoped fingerprints, no runtime migrations. Missing life-domain classification is left unclassified, not fabricated. This adapter has synthetic-contract tests but not live-production validation.
+
 ## MVP status
 
 - Seven life domains with optional **user-owned 1–5 ratings**.
@@ -12,9 +27,9 @@ Facetide does not calculate a happiness score, replace your memory system, or re
 - A goal can support multiple life domains.
 - Immutable confirmed review snapshots (including goal versions), append-only corrections, score history.
 - Read-only **JSONL evidence adapter** with source references, separate occurred/known timestamps, explicit retraction, and cross-domain links.
-- Five stdio MCP tools, SQLite persistence, no telemetry.
+- Five stdio MCP tools plus a reflection prompt, local workbench, SQLite persistence, no telemetry.
 
-This is a runnable single-user core, **not** a finished MR-MEM or Nutrition-Tracker-MCP integration. Those integrations require adapter implementations against verified interfaces.
+This is a runnable single-user core and local workbench. Narrow MR-Mem **AML** and Nutrition-Tracker-MCP **recent 7/30-day report** read-only adapters are implemented against their published contracts. Broader historical integrations and live NAS verification remain outstanding.
 
 ## Install
 
