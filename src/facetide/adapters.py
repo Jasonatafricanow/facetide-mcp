@@ -148,3 +148,115 @@ class MrMemAmlSource:
                 warnings.append(f"MR-Mem evidence capped at {self.max_items}; use a narrower period")
                 records = records[:self.max_items]
         return records, warnings
+
+
+class NutritionMcpSource:
+    """Read-only, bounded recent 7/30-day summary from Nutrition-Tracker-MCP.
+
+    The upstream tool exposes *rolling* windows, not arbitrary past intervals.
+    A report is only returned when its exact upstream coverage fits entirely
+    inside the requested Facetide review window. No interpolation or invented
+    missing days. Authentication is read from an explicit environment variable.
+    """
+
+    def __init__(self, url: str, member_id: str | None = None,
+                 token_env: str = "FACETIDE_NUTRITION_TOKEN"):
+        from urllib.parse import urlsplit
+        parsed = urlsplit(url)
+        local = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+        if (parsed.scheme not in {"https", "http"} or
+            (parsed.scheme == "http" and not local) or
+            parsed.username or parsed.password or parsed.query or parsed.fragment or
+            parsed.path != "/mcp" or not parsed.netloc):
+            raise ValueError("Nutrition MCP URL must be https://host/mcp or loopback http://host/mcp")
+        self.url = url
+        self.member_id = member_id or None
+        self.token_env = token_env
+
+    async def _report(self, days):
+        import os
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamablehttp_client
+
+        token = os.environ.get(self.token_env)
+        if not token:
+            raise ValueError(f"Missing Nutrition MCP bearer token in {self.token_env}")
+        args = {"view": "report", "days": days}
+        if self.member_id:
+            args["memberId"] = self.member_id
+        async with streamablehttp_client(
+            self.url, headers={"Authorization": f"Bearer {token}"}
+        ) as (reader, writer, _):
+            async with ClientSession(reader, writer) as session:
+                await session.initialize()
+                response = await session.call_tool("nutrition_query", arguments=args)
+                if response.isError:
+                    raise ValueError("Nutrition MCP refused report query")
+                payload = response.structuredContent
+                if not payload:
+                    for part in response.content:
+                        if getattr(part, "type", None) == "text":
+                            try:
+                                payload = json.loads(part.text)
+                                break
+                            except (ValueError, TypeError):
+                                pass
+                if isinstance(payload, dict) and "data" in payload and isinstance(payload["data"], dict):
+                    payload = payload["data"]
+                if not isinstance(payload, dict) or payload.get("ok") is not True:
+                    raise ValueError("Nutrition MCP report response contract changed")
+                return payload
+
+    def query(self, period_start, period_end, domains):
+        import asyncio
+        import concurrent.futures
+        from datetime import date, datetime, timezone
+        days = (date.fromisoformat(period_end) - date.fromisoformat(period_start)).days + 1
+        if days <= 0:
+            raise ValueError("invalid report period")
+        if days > 30:
+            return [], ["Nutrition MCP only supports recent 7/30-day reports, not long-range history"]
+        report_days = 7 if days <= 7 else 30
+        try:
+            # A separate event loop avoids collision with an async MCP host.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                report = pool.submit(lambda: asyncio.run(self._report(report_days))).result(timeout=35)
+        except Exception as exc:
+            return [], [f"Nutrition MCP report unavailable: {type(exc).__name__}"]
+        try:
+            from_date = calendar_date(report["fromDate"])
+            to_date = calendar_date(report["toDate"])
+            if from_date > to_date:
+                raise ValueError("invalid source range")
+            if from_date < period_start or to_date > period_end:
+                return [], [
+                    f"Nutrition report covers {from_date}..{to_date}; requested {period_start}..{period_end}. "
+                    "No partial-window statistics inferred."
+                ]
+            details = [("nutrition", report.get("nutrition")), ("health", report.get("health"))]
+            result = []
+            now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            for category, values in details:
+                if not isinstance(values, dict):
+                    continue
+                # Bounded, factual coverage and quantities only. Do not generate
+                # wellness scores or treat unrecorded days as zeros.
+                fields = []
+                for label, value in values.items():
+                    if isinstance(value, (int, float)) and not isinstance(value, bool):
+                        fields.append(f"{label}: {value}")
+                if not fields:
+                    continue
+                summary = (f"Nutrition MCP {category} {from_date}..{to_date} "
+                           f"({report_days}-day rolling report): " + "; ".join(fields))
+                result.append(normalize_evidence({
+                    "source_type": "nutrition-mcp",
+                    "source_ref": f"{category}:{self.member_id or 'single'}:{from_date}:{to_date}",
+                    "occurred_at": to_date, "known_at": now,
+                    "domain_ids": ["health"], "evidence_kind": "fact",
+                    "resolution_status": "active", "change": None,
+                    "summary": summary[:500]
+                }, domains))
+            return result, []
+        except (ValueError, KeyError, TypeError) as exc:
+            return [], [f"Nutrition report invalid: {exc}"]

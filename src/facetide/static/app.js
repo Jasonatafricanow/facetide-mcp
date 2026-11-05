@@ -183,8 +183,9 @@ async function init(){
  try{
   const bootstrap=await api('/api/bootstrap');state.token=bootstrap.token;
   $('sourceStatus').textContent='数据源：'+bootstrap.source;$('appVersion').textContent=bootstrap.version;
-  const now=new Date(),y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0');
-  $('startDate').value=y+'-'+m+'-01';$('endDate').value=y+'-'+m+'-'+String(now.getDate()).padStart(2,'0');
+  const now=new Date(),from=new Date(now.getFullYear(),now.getMonth(),now.getDate()-29);
+  const dateText=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+  $('startDate').value=dateText(from);$('endDate').value=dateText(now);
   renderGoalOptions();renderRatingRows();
   document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.page)));
   document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.go)));

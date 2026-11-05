@@ -29,7 +29,7 @@ See [Product workbench and MR-Mem setup](docs/product-workbench.md). The UI and 
 - Read-only **JSONL evidence adapter** with source references, separate occurred/known timestamps, explicit retraction, and cross-domain links.
 - Five stdio MCP tools plus a reflection prompt, local workbench, SQLite persistence, no telemetry.
 
-This is a runnable single-user core and local workbench. A narrow MR-Mem **AML read-only adapter** is implemented, using Atlas's published storage contract; Nutrition-Tracker-MCP native integration and broader MR-Mem contracts are deferred.
+This is a runnable single-user core and local workbench. Narrow MR-Mem **AML** and Nutrition-Tracker-MCP **recent 7/30-day report** read-only adapters are implemented against their published contracts. Broader historical integrations and live NAS verification remain outstanding.
 
 ## Install
 

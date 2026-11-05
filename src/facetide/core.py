@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .sources import EmptySource, EvidenceSource, JsonlSource
-from .adapters import CompositeSource, MrMemAmlSource
+from .adapters import CompositeSource, MrMemAmlSource, NutritionMcpSource
 
 DOMAINS = {
     "career": "Work & career",
@@ -95,6 +95,10 @@ class LifeStore:
                 raise ValidationError("MR-Mem integration requires both FACETIDE_MRMEM_DIR and FACETIDE_MRMEM_USER_ID")
             if mr_dir:
                 sources.append(MrMemAmlSource(mr_dir, mr_user))
+            nutrition_url = os.environ.get("FACETIDE_NUTRITION_MCP_URL")
+            if nutrition_url:
+                sources.append(NutritionMcpSource(
+                    nutrition_url, member_id=os.environ.get("FACETIDE_NUTRITION_MEMBER_ID")))
             evidence_file = os.environ.get("FACETIDE_EVIDENCE_FILE")
             if evidence_file:
                 sources.append(JsonlSource(evidence_file))
