@@ -78,6 +78,27 @@ def facetide_get_history(domain_id: str | None = None, limit: int = 12) -> dict:
     return LifeStore().get_history(domain_id=domain_id, limit=limit)
 
 
+@mcp.prompt()
+def facetide_reflection_guide(period: str = "this month") -> str:
+    """Agent workflow for gentle, evidence-grounded 2+7 reflection."""
+    return (
+        f"Facilitate a Facetide reflection for {period}. "
+        "First call facetide_get_snapshot and facetide_prepare_review. "
+        "Explain important events in their temporal context, distinguish source facts, "
+        "user statements and model inferences, and cite source_type/source_ref. "
+        "Do not treat silence as decline or progress as happiness. "
+        "Ask the user for 1–5 satisfaction scores only where meaningful; allow omissions. "
+        "Use career/finance/health/family/social/leisure/environment as seven domains. "
+        "Treat personal growth (world changed me) and self-realization "
+        "(I changed the world) as unscored narrative axes. "
+        "A goal's enough condition determines maintaining versus building; never "
+        "escalate a met goal automatically. Suggest reflecting or simplifying when "
+        "the effort no longer pays off. Do not let evidence overwrite user judgment. "
+        "Only call write tools after the user confirms exact edits/review. "
+        "A confirmation flag represents user approval; never forge that approval."
+    )
+
+
 def main() -> None:
     """Launch as a local stdio subprocess; keep stdout protocol-only."""
     mcp.run(transport="stdio")

@@ -1,0 +1,78 @@
+# Facetide Workbench — v0.2
+
+## Run locally
+
+\`\`\`sh
+python -m pip install -e .
+facetide-web
+\`\`\`
+
+The local workbench opens at http://127.0.0.1:8765. To skip auto-opening a browser or choose a different local port:
+
+\`\`\`sh
+facetide-web --no-browser --port 8876
+\`\`\`
+
+This starts a **separate process** from \`facetide-mcp\`; both point to the same SQLite database via \`FACETIDE_DB_PATH\`. No internet connectivity or remote account is required. The workbench binds **127.0.0.1 only**, checks the Host header, uses a random in-memory CSRF token for mutations, rejects cross-origin mutations, and has a restrictive CSP. It is intentionally not suitable for publishing on a public interface.
+
+## Four product views
+
+### Overview
+- Seven separate subjective 1–5 ratings on a wheel display; missing ratings remain empty, not zero.
+- Two unscored axes, personal growth and self-realization.
+- Goal counts per domain, newest user-confirmed snapshot.
+
+### Review
+- Choose a date period; previous finished period is shown for context.
+- Inspect evidence returned from available source adapters, including source, event time, known time, domain labels (or unclassified), and retraction.
+- Select active evidence references to freeze with this review.
+- Leave any domain unscored; explicitly choose ratings only after seeing evidence.
+- Adjust suggested new/stable/receding changes before confirming.
+- Provide two narrative reflections and a freeform note.
+- Confirmation checkbox is required; write persists an immutable review.
+
+### Goals
+- Define a goal and the \`enough_condition\` in the user's own terms.
+- Associate the same goal with multiple domains.
+- Move between building, maintaining, reflecting, and simplifying (no automatic escalation).
+- Revisions use optimistic concurrency to prevent stale overwrites.
+
+### History
+- Browse chronological user-confirmed reviews.
+- See domain-specific scores, narrative summaries, and evidence reference counts.
+- Correct a historical record by creating a linked \`revision_of\` record, retaining the original.
+
+## MR-Mem AML connection
+
+This opt-in adapter uses ATLAS's documented read-only MR-Mem AML store contract and does **not** instantiate MR-Mem's runtime. Configure **both**:
+
+\`\`\`sh
+export FACETIDE_MRMEM_DIR=/absolute/path/to/existing/aml-store
+export FACETIDE_MRMEM_USER_ID=actual_user_scope
+facetide-web
+\`\`\`
+
+The directory must contain \`memory.sqlite\` and \`aml_source.sqlite\`.
+
+The adapter:
+- reads only scope domain=\`user\`, exact configured \`user_id\`;
+- checks each native SourceRef against current message identity, fingerprint, and SHA256 content;
+- reads only existing compiled semantic content as a short candidate summary;
+- uses native \`occurred_at\` only when source time is explicitly given, and \`committed_at\` as its separate known timestamp;
+- respects active vs inactive memory lifecycle;
+- does not automatically infer a life domain or claim an objective event change where labels are absent.
+
+A compiled semantic memory is classified as **inference** in Facetide, not as a proven real-world fact. A staged summary can be discussed by the Agent, but is not silently persisted as an objective user attribute.
+
+**Scope:** Verified against a synthetic store following ATLAS's MR-Mem AML reader schema. It is not a universal MR-Mem backend adapter and has not yet been exercised against live personal production storage. Keep private paths and data out of the GitHub repository.
+
+## Other source paths
+
+\`FACETIDE_EVIDENCE_FILE\` can point to a separately maintained standard JSONL projection. If both AML and JSONL are configured, Facetide queries both read-only and keeps source references distinct. Other memory systems or specialist MCPs can expose evidence via this documented bridge while native adapters are developed.
+
+## Important limitations
+
+- Source-related semantic classification and change candidates still depend on upstream metadata or Agent interpretation. Facetide **does not** autonomously establish what happened from silence.
+- Nutrition MCP has a known \`nutrition_query(view="report", days=7|30)\` API, but no general arbitrary-period read contract has been adopted here. The product deliberately does not invent historical nutrition timelines.
+- The workbench is not a standalone AI-chat client; connect the separately provided MCP server to a host Agent for natural language reviews and the \`facetide_reflection_guide\` prompt.
+- No scheduling/background monitoring, household auth, public hosting, or browser/mobile sync.
