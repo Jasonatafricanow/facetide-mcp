@@ -46,6 +46,7 @@ def facetide_context(period_start: str, period_end: str, history_limit: int = 0)
     store = LifeStore()
     result = store.agent_brief(period_start, period_end)
     result["latest_draft"] = store.get_agent_review(period_start, period_end)["draft"]
+    result["confirmed_review"] = store.get_period_review(period_start, period_end)
     if history_limit:
         result["history"] = store.get_history(limit=history_limit)
     return result

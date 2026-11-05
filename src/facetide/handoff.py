@@ -299,20 +299,19 @@ class AgentHandoff:
         realization = next(a for a in body["axes"] if a["axis"] == "self_realization")
         growth_text = growth["narrative"] if personal_growth is None else personal_growth
         realization_text = realization["narrative"] if self_realization is None else self_realization
-        review = self.store.save_review(
-            period_start=body["period_start"], period_end=body["period_end"],
-            domain_scores=domain_scores, user_confirmed=True, user_notes=user_notes,
-            personal_growth=growth_text, self_realization=realization_text,
-            revision_of=revision_of,
-        )
-        # The approved draft remains immutable. Short host-attested source
-        # summaries are referenced through the associated frozen draft; these
-        # are NOT silently converted into independently verified facts.
         with self.store._connection() as db:
+            review = self.store.save_review(
+                period_start=body["period_start"], period_end=body["period_end"],
+                domain_scores=domain_scores, user_confirmed=True, user_notes=user_notes,
+                personal_growth=growth_text, self_realization=realization_text,
+                revision_of=revision_of, _db=db,
+            )
             db.execute(
                 """INSERT INTO agent_review_links(review_id,draft_id,draft_hash)
                    VALUES(?,?,?)""",
                 (review["review_id"], draft_id, expected_hash),
             )
+            review = self.store._review(db.execute(
+                "SELECT * FROM reviews WHERE id=?", (review["review_id"],)).fetchone(), db)
         return {"review": review, "approved_draft_id": draft_id,
                 "draft_hash": expected_hash, "verification": "host_attested"}

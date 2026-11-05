@@ -5,7 +5,7 @@ import json
 import os
 import sqlite3
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -233,11 +233,21 @@ class LifeStore:
             })
         return result
 
-    @staticmethod
-    def _review(row: sqlite3.Row | None) -> dict | None:
+    def _review(self, row: sqlite3.Row | None, db=None) -> dict | None:
         if row is None:
             return None
+        if db is None:
+            with self._connection() as connection:
+                return self._review(row, connection)
+        linked = db.execute(
+            """SELECT d.*, l.draft_hash FROM agent_review_links l
+               JOIN agent_handoff_drafts d ON d.id=l.draft_id WHERE l.review_id=?""",
+            (row["id"],)).fetchone()
         return {
+            "approved_draft": ({**json.loads(linked["body_json"]),
+                                "draft_id": linked["id"], "draft_hash": linked["draft_hash"],
+                                "status": "user_confirmed", "verification": "host_attested"}
+                               if linked else None),
             "review_id": row["id"],
             "period_start": row["period_start"], "period_end": row["period_end"],
             "confirmed_at": row["confirmed_at"],
@@ -304,10 +314,12 @@ class LifeStore:
                 if row["version"] != expected_version:
                     raise GoalConflict(f"Goal version conflict: expected {expected_version}, actual {row['version']}")
                 version = expected_version + 1
-                db.execute("""UPDATE goals SET title=?, enough_condition=?, status=?,
+                updated = db.execute("""UPDATE goals SET title=?, enough_condition=?, status=?,
                               indicators_json=?, version=?, updated_at=? WHERE id=? AND version=?""",
                            (title, enough_condition, status, encoded_indicators, version,
                             now, goal_id, expected_version))
+                if updated.rowcount != 1:
+                    raise GoalConflict("Goal changed during update; reload before editing")
                 db.execute("DELETE FROM goal_domains WHERE goal_id=?", (goal_id,))
             db.executemany("INSERT INTO goal_domains (goal_id, domain_id) VALUES (?,?)",
                            [(goal_id, d) for d in dims])
@@ -420,6 +432,15 @@ class LifeStore:
         from .handoff import AgentHandoff
         return AgentHandoff(self).get(period_start, period_end)
 
+    def get_period_review(self, period_start: str, period_end: str) -> dict | None:
+        """Read the latest confirmed review of this exact period, including its draft."""
+        _period(period_start, period_end)
+        with self._connection() as db:
+            return self._review(db.execute(
+                """SELECT * FROM reviews WHERE period_start=? AND period_end=?
+                   ORDER BY confirmed_at DESC, rowid DESC LIMIT 1""",
+                (period_start, period_end)).fetchone(), db)
+
     def confirm_agent_review(self, *, draft_id: str, expected_hash: str,
                              domain_scores: dict[str,int], user_confirmed: bool,
                              user_notes: str = "", personal_growth: str | None = None,
@@ -452,6 +473,7 @@ class LifeStore:
             "previous_review": previous, "goals": goals, "evidence": items,
             "state_report": state_report,
             "agent_handoff": self.get_agent_review(period_start, period_end),
+            "confirmed_review": self.get_period_review(period_start, period_end),
             "domain_cards": list(assembled["domains"].values()),
             "axis_drafts": assembled["axes"],
             "change_candidates": assembled["change_candidates"],
@@ -475,7 +497,8 @@ class LifeStore:
                     change_band: dict[str, list[str]] | None = None,
                     evidence_refs: list[dict[str, str]] | None = None,
                     personal_growth: str = "", self_realization: str = "",
-                    user_notes: str = "", revision_of: str | None = None) -> dict:
+                    user_notes: str = "", revision_of: str | None = None,
+                    _db=None) -> dict:
         if user_confirmed is not True:
             raise ValidationError("Review scores and interpretation require user confirmation")
         _period(period_start, period_end)
@@ -524,7 +547,7 @@ class LifeStore:
                     selected_item["classification"] = "source_tagged"
                 selected.append(selected_item)
                 seen.add(key)
-        with self._connection() as db:
+        with (nullcontext(_db) if _db is not None else self._connection()) as db:
             if revision_of:
                 prior = db.execute("SELECT period_start,period_end FROM reviews WHERE id=?",
                                    (revision_of,)).fetchone()
@@ -540,7 +563,7 @@ class LifeStore:
                 _json(self._goals(db)), _json(changes), _json(selected),
                 personal_growth, self_realization, user_notes, revision_of,
             ))
-            return self._review(db.execute("SELECT * FROM reviews WHERE id=?", (review_id,)).fetchone())
+            return self._review(db.execute("SELECT * FROM reviews WHERE id=?", (review_id,)).fetchone(), db)
 
     def get_history(self, domain_id: str | None = None, limit: int = 12) -> dict:
         if domain_id is not None and domain_id not in DOMAIN_IDS:
