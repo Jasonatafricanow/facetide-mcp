@@ -150,6 +150,29 @@ class LifeStore:
                 );
                 CREATE INDEX IF NOT EXISTS ix_reviews_period
                     ON reviews(period_end DESC, confirmed_at DESC);
+                CREATE TABLE IF NOT EXISTS compiled_evidence (
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT NOT NULL,
+                    source_hash TEXT NOT NULL,
+                    domains_json TEXT NOT NULL,
+                    axes_json TEXT NOT NULL,
+                    change_kind TEXT NOT NULL,
+                    confidence TEXT NOT NULL,
+                    observation TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    compiled_at TEXT NOT NULL,
+                    PRIMARY KEY (source_type, source_ref)
+                );
+                CREATE TABLE IF NOT EXISTS compiled_axes (
+                    period_start TEXT NOT NULL,
+                    period_end TEXT NOT NULL,
+                    axis TEXT NOT NULL,
+                    signature TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    evidence_refs_json TEXT NOT NULL,
+                    compiled_at TEXT NOT NULL,
+                    PRIMARY KEY (period_start, period_end, axis, signature)
+                );
             """)
         if os.name == "posix":
             os.chmod(self.path, 0o600)
@@ -253,29 +276,56 @@ class LifeStore:
     def _evidence(self, start: str, end: str) -> tuple[list[dict], list[str]]:
         return self.source.query(start, end, DOMAIN_IDS)
 
+    def get_compilation_batch(self, period_start: str, period_end: str,
+                              offset: int = 0, limit: int = 25) -> dict:
+        """Read a bounded, source-backed semantic-classification batch."""
+        from .compiler import SemanticAssembler
+        return SemanticAssembler(self).get_batch(period_start, period_end, offset, limit)
+
+    def compile_batch(self, *, period_start: str, period_end: str, offset: int,
+                      limit: int, batch_fingerprint: str, annotations: list[dict],
+                      axis_insights: list[dict] | None = None) -> dict:
+        """Store only model-proposed mappings and source-cited narrative candidates.
+
+        This does not write user ratings, goals, or confirmed narrative memory.
+        """
+        from .compiler import SemanticAssembler
+        return SemanticAssembler(self).compile_batch(
+            period_start, period_end, offset, limit, batch_fingerprint, annotations, axis_insights)
+
     def prepare_review(self, period_start: str, period_end: str) -> dict:
-        _period(period_start, period_end)
-        items, warnings = self._evidence(period_start, period_end)
+        """Project existing memory/metrics into seven evidence cards and two narrative axes.
+
+        No AI classification is performed inside the Python server. A host Agent
+        should fetch/compile source batches first; unclassified items remain visible.
+        """
+        from .compiler import SemanticAssembler
+        assembler = SemanticAssembler(self)
+        items, warnings = assembler._items(period_start, period_end)
+        assembled = assembler.assemble(period_start, period_end, items=items)
         with self._connection() as db:
             previous = self._review(db.execute(
                 """SELECT * FROM reviews WHERE period_end < ?
                    ORDER BY period_end DESC, confirmed_at DESC, rowid DESC LIMIT 1""",
                 (period_start,)).fetchone())
             goals = self._goals(db)
-        groups = {d: [] for d in CHANGE_TYPES}
-        for item in items:
-            if item["resolution_status"] == "active" and item["change"] in groups:
-                groups[item["change"]].append({
-                    "source_type": item["source_type"], "source_ref": item["source_ref"],
-                    "domain_ids": item["domain_ids"], "summary": item["summary"],
-                    "evidence_kind": item["evidence_kind"],
-                })
         return {
             "period_start": period_start, "period_end": period_end,
             "previous_review": previous, "goals": goals, "evidence": items,
-            "change_candidates": {k: v[:40] for k, v in groups.items()},
+            "domain_cards": list(assembled["domains"].values()),
+            "axis_drafts": assembled["axes"],
+            "change_candidates": assembled["change_candidates"],
+            "compilation": assembled["counts"],
+            "pending_evidence": assembled["pending"],
+            "unclassified_evidence": assembled["unclassified"],
+            "stale_annotations": assembled["stale_annotations"],
             "warnings": warnings,
-            "guidance": "Evidence is not a satisfaction score; ask user to confirm every rating and interpretation.",
+            "guidance": (
+                "Host Agent: compile outstanding source-backed evidence first. "
+                "All seven domains contain evidence projections, never inferred "
+                "satisfaction ratings. Two axes are editable, unscored narrative drafts. "
+                "User must confirm final interpretations and scores."
+            )
         }
 
     def save_review(self, *, period_start: str, period_end: str,
@@ -308,9 +358,11 @@ class LifeStore:
         refs = evidence_refs if evidence_refs is not None else []
         if not isinstance(refs, list):
             raise ValidationError("evidence_refs must be a list")
-        available, _ = self._evidence(period_start, period_end)
-        by_ref = {(x["source_type"], x["source_ref"]): x for x in available
-                  if x["resolution_status"] == "active"}
+        from .compiler import SemanticAssembler, refkey, digest
+        available, _ = SemanticAssembler(self)._items(period_start, period_end)
+        by_ref = {refkey(x): x for x in available if x["resolution_status"] == "active"}
+        with self._connection() as db:
+            compiled = SemanticAssembler(self)._annotations(db)
         selected, seen = [], set()
         for ref in refs:
             if not isinstance(ref, dict):
@@ -320,9 +372,16 @@ class LifeStore:
                 raise ValidationError(f"Evidence missing, revoked or out of range: {key}")
             if key not in seen:
                 item = by_ref[key]
-                selected.append({k: item[k] for k in (
+                selected_item = {k: item[k] for k in (
                     "source_type", "source_ref", "occurred_at", "known_at",
-                    "domain_ids", "evidence_kind")})
+                    "domain_ids", "evidence_kind")}
+                annotation = compiled.get(key)
+                if annotation and annotation["source_hash"] == digest(item):
+                    selected_item["domain_ids"] = json.loads(annotation["domains_json"])
+                    selected_item["classification"] = "agent_compiled"
+                else:
+                    selected_item["classification"] = "source_tagged"
+                selected.append(selected_item)
                 seen.add(key)
         with self._connection() as db:
             if revision_of:

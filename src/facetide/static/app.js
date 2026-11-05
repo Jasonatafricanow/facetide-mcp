@@ -230,6 +230,8 @@ async function init(){
   $('resetGoal').addEventListener('click',resetGoal);
   $('cancelRevision').addEventListener('click',()=>{state.revisionOf=null;$('revisionNotice').hidden=true});
   await reload();
+  // Initial view pulls evidence without requiring a manual scoring session.
+  await loadContext();
  }catch(e){toast('无法连接本地服务：'+e.message,true)}
 }
 window.addEventListener('DOMContentLoaded',init);
