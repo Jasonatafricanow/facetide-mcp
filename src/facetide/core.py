@@ -217,6 +217,10 @@ class LifeStore:
             indicators = {}
         if not isinstance(indicators, dict) or any(x not in {"outcome", "driver", "guardrail"} for x in indicators):
             raise ValidationError("indicators accepts only outcome, driver and guardrail")
+        if any(not isinstance(value, list) or len(value) > 10
+               or any(not isinstance(item, str) or not item.strip() or len(item) > 200
+                      for item in value) for value in indicators.values()):
+            raise ValidationError("each indicator category must be a list of at most 10 nonempty strings (200 chars each)")
         encoded_indicators = _json(indicators)
         now = _utc_now()
         with self._connection() as db:

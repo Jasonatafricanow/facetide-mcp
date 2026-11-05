@@ -97,6 +97,7 @@ async function loadContext(){
   if(!start||!end||start>end)throw Error('请选择有效的开始和结束日期');
   const ctx=await api('/api/context?'+new URLSearchParams({start,end}));
   state.ratings={};state.revisionOf=null;$('revisionNotice').hidden=true;$('reviewConfirm').checked=false;
+  for(const id of ['growthInput','realizationInput','reviewNote'])$(id).value='';
   renderContext(ctx);
   return ctx;
  }catch(e){toast(e.message,true);return null}

@@ -57,6 +57,12 @@ class LifeStoreTests(unittest.TestCase):
             self.goal(status="always_improve")
         with self.assertRaises(ValidationError):
             self.goal(indicators={"happiness": 99})
+        with self.assertRaises(ValidationError):
+            self.goal(indicators={"outcome": "not an array"})
+        with self.assertRaises(ValidationError):
+            self.goal(indicators={"driver": [""]})
+        saved = self.goal(indicators={"outcome": ["rested most mornings"], "guardrail": ["work must remain sustainable"]})
+        self.assertEqual(saved["indicators"]["outcome"], ["rested most mornings"])
 
     def test_review_is_user_rated_and_immutable(self):
         goal = self.goal()
