@@ -1,24 +1,106 @@
 """Facetide stdio MCP server.
 
-Write tools use explicit user_confirmed fields. This is a protocol-level
-requirement for the calling Agent, not a cryptographic proof of consent.
+Default profile intentionally exposes only THREE tools: context, draft, confirm.
+All semantic understanding belongs to the host Agent. Legacy and goal-edit
+tools require an explicit configuration opt-in.
 """
 from __future__ import annotations
 
+import os
+
 from mcp.server.fastmcp import FastMCP
 
-from .core import LifeStore
+from .core import LifeStore, ValidationError
 
 mcp = FastMCP("Facetide")
 
+PROFILE = os.environ.get("FACETIDE_TOOL_PROFILE", "compact").lower().strip()
+if PROFILE not in {"compact", "legacy"}:
+    raise ValueError("FACETIDE_TOOL_PROFILE must be compact or legacy")
+
+
+def _legacy_tool(fn):
+    """Keep Python APIs importable but hide old MCP tools by default."""
+    return mcp.tool()(fn) if PROFILE == "legacy" else fn
+
+
+def _goal_tool(fn):
+    """Opt-in goal writes; the local workbench already has a goal editor."""
+    return mcp.tool()(fn) if (
+        PROFILE == "legacy" or os.environ.get("FACETIDE_ENABLE_GOAL_TOOL") == "1"
+    ) else fn
+
 
 @mcp.tool()
+def facetide_context(period_start: str, period_end: str, history_limit: int = 0) -> dict:
+    """Start or resume a 7+2 reflection. ONE read tool for schema, goals, history.
+
+    Call this first for a chosen inclusive period. Returns a structured
+    handoff schema, prior confirmed user evaluation, existing goals, optional
+    latest staged draft, and optional confirmed history (history_limit 1..20).
+    The host LLM then calls StateBar, MR-MEM and specialist MCPs ITSELF.
+    Facetide does not run a classifier or retrieve those providers here.
+    """
+    if type(history_limit) is not int or not 0 <= history_limit <= 20:
+        raise ValidationError("history_limit must be an integer 0..20")
+    store = LifeStore()
+    result = store.agent_brief(period_start, period_end)
+    result["latest_draft"] = store.get_agent_review(period_start, period_end)["draft"]
+    if history_limit:
+        result["history"] = store.get_history(limit=history_limit)
+    return result
+
+
+@mcp.tool()
+def facetide_draft(
+    period_start: str, period_end: str, evidence: list[dict],
+    domains: list[dict], axes: list[dict], agent_note: str = "",
+) -> dict:
+    """Stage exactly 7 domain observations + 2 unscored narrative axes.
+
+    The HOST LLM interprets dialog and upstream StateBar/MR-MEM/other tool
+    results. Facetide validates structure, referenced source IDs, timestamps
+    and user-value attribution; does NOT infer meaning or 1–5 scores.
+    For each domain, distinguish observation from meaning.assessment/basis/why,
+    and mark any value hypothesis as agent_hypothesis, never user-endorsed.
+    Read facetide_context for the full machine-readable contract first.
+    """
+    return LifeStore().stage_agent_review(
+        period_start=period_start, period_end=period_end, evidence=evidence,
+        domains=domains, axes=axes, agent_note=agent_note,
+    )
+
+
+@mcp.tool()
+def facetide_confirm(
+    draft_id: str, expected_hash: str, domain_scores: dict[str, int],
+    user_confirmed: bool, user_notes: str = "",
+    personal_growth: str | None = None,
+    self_realization: str | None = None,
+    revision_of: str | None = None,
+) -> dict:
+    """Freeze an explicitly user-approved draft, their ratings and narrative.
+
+    Use only AFTER the user has inspected/approved this exact draft.
+    domain_scores may omit domains; never fabricate values.
+    A confirmation flag is a tool-level contract, not proof of real consent.
+    Store an immutable review linked to the draft hash.
+    """
+    return LifeStore().confirm_agent_review(
+        draft_id=draft_id, expected_hash=expected_hash,
+        domain_scores=domain_scores, user_confirmed=user_confirmed,
+        user_notes=user_notes, personal_growth=personal_growth,
+        self_realization=self_realization, revision_of=revision_of,
+    )
+
+
+@_legacy_tool
 def facetide_get_snapshot() -> dict:
     """Read the current seven life domains, latest user ratings, and goals."""
     return LifeStore().get_snapshot()
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_prepare_review(period_start: str, period_end: str) -> dict:
     """Build review context (YYYY-MM-DD inclusive); NEVER infer ratings from evidence.
 
@@ -28,7 +110,7 @@ def facetide_prepare_review(period_start: str, period_end: str) -> dict:
     return LifeStore().prepare_review(period_start, period_end)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_publish_source_bundle(records: list[dict]) -> dict:
     """Opt-in generic ingestion of provider-scoped summaries by a host Agent.
 
@@ -43,7 +125,7 @@ def facetide_publish_source_bundle(records: list[dict]) -> dict:
     return LifeStore().publish_source_bundle(records)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_get_compilation_batch(
     period_start: str, period_end: str, offset: int = 0, limit: int = 25,
 ) -> dict:
@@ -60,7 +142,7 @@ def facetide_get_compilation_batch(
     return LifeStore().get_compilation_batch(period_start, period_end, offset, limit)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_compile_batch(
     period_start: str, period_end: str,
     offset: int, limit: int, batch_fingerprint: str,
@@ -84,7 +166,7 @@ def facetide_compile_batch(
     )
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_agent_brief(period_start: str, period_end: str) -> dict:
     """Get the Facetide Agent handoff v1 protocol, prior user review and goals.
 
@@ -95,7 +177,7 @@ def facetide_agent_brief(period_start: str, period_end: str) -> dict:
     return LifeStore().agent_brief(period_start, period_end)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_stage_agent_review(
     period_start: str, period_end: str, evidence: list[dict],
     domains: list[dict], axes: list[dict], agent_note: str = "",
@@ -119,13 +201,13 @@ def facetide_stage_agent_review(
         domains=domains, axes=axes, agent_note=agent_note)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_get_agent_review(period_start: str, period_end: str) -> dict:
     """Return the most recent staged host-Agent 7+2 proposal for user review."""
     return LifeStore().get_agent_review(period_start, period_end)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_confirm_agent_review(
     draft_id: str, expected_hash: str,
     domain_scores: dict[str, int], user_confirmed: bool,
@@ -145,7 +227,7 @@ def facetide_confirm_agent_review(
         self_realization=self_realization, revision_of=revision_of)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_get_state_context(period_start: str, period_end: str) -> dict:
     """LEGACY OPTIONAL: obtain context for the experimental state compiler.
 
@@ -156,7 +238,7 @@ def facetide_get_state_context(period_start: str, period_end: str) -> dict:
     return LifeStore().get_state_context(period_start, period_end)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_compile_state_report(
     period_start: str, period_end: str, context_token: str,
     domains: list[dict], axes: list[dict],
@@ -183,7 +265,7 @@ def facetide_compile_state_report(
         context_token=context_token, domains=domains, axes=axes)
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_get_state_report(period_start: str, period_end: str) -> dict:
     """LEGACY OPTIONAL: read old state compiler proposals and source integrity.
 
@@ -192,7 +274,7 @@ def facetide_get_state_report(period_start: str, period_end: str) -> dict:
     return LifeStore().get_state_report(period_start, period_end)
 
 
-@mcp.tool()
+@_goal_tool
 def facetide_upsert_goal(
     title: str, enough_condition: str, domain_ids: list[str],
     user_confirmed: bool, status: str = "building",
@@ -212,7 +294,7 @@ def facetide_upsert_goal(
     )
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_save_review(
     period_start: str, period_end: str, domain_scores: dict[str, int],
     user_confirmed: bool, change_band: dict[str, list[str]] | None = None,
@@ -236,7 +318,7 @@ def facetide_save_review(
     )
 
 
-@mcp.tool()
+@_legacy_tool
 def facetide_get_history(domain_id: str | None = None, limit: int = 12) -> dict:
     """List immutable period reviews; optionally filter to a rated domain."""
     return LifeStore().get_history(domain_id=domain_id, limit=limit)
@@ -244,36 +326,26 @@ def facetide_get_history(domain_id: str | None = None, limit: int = 12) -> dict:
 
 @mcp.prompt()
 def facetide_reflection_guide(period: str = "this month") -> str:
-    """Normative Agent-led tool workflow: understand, standardize, confirm."""
+    """Three-tool 7+2 workflow, with source interpretation owned by the LLM."""
     return (
-        f"Perform a Facetide 7+2 reflection for {period}. "
-        "FIRST call facetide_agent_brief for the chosen inclusive dates. "
-        "YOU, the host LLM, are responsible for interpreting conversational "
-        "context and the user's own criteria for what is worthwhile or costly. "
-        "Call whichever upstream tools are ACTUALLY connected. In particular, "
-        "if StateBar-MCP is connected, use user_state.snapshot, "
-        "user_state.get_state and user_state.context_candidates with the "
-        "real scoped subject_id for current states, validity and transitions; "
-        "do not mistake a bounded snapshot for full life history. "
-        "Use existing MR-MEM/ATLAS memory evidence for long-term context and "
-        "Nutrition or other specialist MCPs for objective measurements. "
-        "Do not call user_state.observe merely to perform a review. "
-        "Reconcile events and short-lived states semantically in YOUR OWN "
-        "reasoning. Attribute every claim to source IDs. "
-        "Construct exactly seven domain records and two narrative axes under "
-        "facetide.agent_handoff.v1. Separate observed state from what it means "
-        "to THIS user: why the change is worthwhile, costly, mixed or uncertain. "
-        "For value judgments distinguish explicit user statements, previously "
-        "confirmed preferences and your own hypotheses. Do not promote "
-        "hypotheses into endorsed facts. Unknown is an acceptable domain state. "
-        "Submit a complete draft with facetide_stage_agent_review. "
-        "Facetide only validates and stores your structured interpretation; "
-        "it does not infer, categorize, plan or score on your behalf. "
-        "Ask for the user's actual subjective ratings or corrections only "
-        "as needed; do not ask seven ritual questions. "
-        "After explicit user approval call facetide_confirm_agent_review. "
-        "Do not use the legacy semantic compiler or state-synthesis tools "
-        "unless the caller specifically requests those experimental paths."
+        f"Organize a Facetide life reflection for {period}. "
+        "1. Call facetide_context(start,end) for the seven domain/two axis "
+        "contract, prior user assessments and goals. "
+        "2. YOU, the host LLM, call the existing connected StateBar tools "
+        "user_state.snapshot/get_state/context_candidates using a known "
+        "subject_id when available. Use MR-MEM for long-term memory, and "
+        "other specialist MCPs only when available; do not invent sources. "
+        "Interpret conversation, current state, what the user values and "
+        "which trade-offs they consider worthwhile. Attribute every claim "
+        "and explicitly distinguish user statements, confirmed history "
+        "and unverified Agent hypotheses. "
+        "3. Call facetide_draft with one shared evidence registry, exactly "
+        "seven domains (unknown allowed), and two unscored narrative axes. "
+        "Facetide only validates and stages your interpretation. "
+        "4. Ask only consequential clarifications or user satisfaction "
+        "ratings; never auto-score. After explicit user approval, call "
+        "facetide_confirm to freeze the draft and confirmed review. "
+        "There is no need to call any legacy compiler or state tools."
     )
 
 

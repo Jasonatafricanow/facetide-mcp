@@ -224,7 +224,7 @@ class AgentHandoff:
                 "Attribute value explanations to explicit user expression, confirmed history, or an Agent hypothesis.",
                 "Never infer subjective 1-5 satisfaction scores. Ask for those only at confirmation.",
                 "StateBar snapshot is bounded and current-only, not a complete historical timeline.",
-                "Submit one draft with facetide_stage_agent_review, then review it with the user.",
+                "Submit one draft with facetide_draft, then review it with the user.",
                 "Freeze only the user's explicitly approved interpretation and ratings.",
             ],
             "note": "This endpoint is a normative schema/brief, not an LLM or an automatic tool orchestrator.",

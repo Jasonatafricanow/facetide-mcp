@@ -3,4 +3,4 @@
 from .core import DOMAINS, GoalConflict, LifeStore, ValidationError
 
 __all__ = ["DOMAINS", "GoalConflict", "LifeStore", "ValidationError"]
-__version__ = "0.5.0"
+__version__ = "0.5.1"

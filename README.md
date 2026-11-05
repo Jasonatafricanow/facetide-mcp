@@ -4,7 +4,7 @@
 
 Facetide does not calculate a happiness score, replace your memory system, or require daily check-ins. It organizes existing evidence for periodic reflection; only the user decides whether a domain is satisfying, what counts as enough, and whether a goal is worth continuing.
 
-## Current version: 0.5.0 — Agent-led standard handoff
+## Current version: 0.5.1 — Compact MCP tool discovery
 
 In addition to the MCP protocol, v0.2 includes a **local four-view workbench** with a seven-sector wheel, guided period reviews, selected evidence refs, goal lifecycle editor and immutable history.
 
@@ -19,7 +19,42 @@ See [Product workbench and MR-Mem setup](docs/product-workbench.md). The UI and 
 
 **Optional native read-only MR-Mem AML adapter:** specify both `FACETIDE_MRMEM_DIR` and `FACETIDE_MRMEM_USER_ID`. It projects verified canonical memories from existing `memory.sqlite` and `aml_source.sqlite` with scoped fingerprints, no runtime migrations. Missing life-domain classification is left unclassified, not fabricated. This adapter has synthetic-contract tests but not live-production validation.
 
+## Default MCP interface: exactly three tools
+
+The core Agent workflow is exposed with three tools, not the old fifteen:
+
+| Tool | When to use |
+| --- | --- |
+| `facetide_context(period_start,period_end,history_limit=0)` | Start/resume a period. Returns protocol, goals, earlier user assessments, latest staged draft, optional short review history |
+| `facetide_draft(period_start,period_end,evidence,domains,axes)` | After the **host LLM** reads StateBar/MR-MEM/other data and interprets what it means to the user, stage exactly 7+2 sourced observations |
+| `facetide_confirm(draft_id,expected_hash,domain_scores,user_confirmed)` | Only after explicit user approval, freeze their ratings and narrative against the exact draft |
+
+The browser's goal editor remains available without exposing another Agent tool.
+When user-directed goal edits through chat are required, opt in to one additional
+tool with `FACETIDE_ENABLE_GOAL_TOOL=1`.
+
+All fifteen original MCP tool names still exist for migration only:
+
+~~~sh
+FACETIDE_TOOL_PROFILE=legacy facetide-mcp
+~~~
+
+Default is `FACETIDE_TOOL_PROFILE=compact`. Setting `legacy` exposes the
+three current tools **plus all fifteen original tools**, not only the original
+tools. No changes to SQLite schemas or old Python method imports are required.
+
+The `facetide_reflection_guide` MCP prompt explains the three-tool workflow,
+and `facetide_context` returns the full handoff JSON Schema **only on demand**.
+The host LLM still performs semantic interpretation. This is *progressive
+disclosure*: the default tool inventory is small while the protocol's deep
+requirements are provided when the Agent needs them.
+
+**Important:** Fewer exposed tools is a discovery-surface improvement, not a
+measured improvement in live Agent tool accuracy. Real-world turn counts,
+parameter errors, and correction rates still need evaluation.
+
 ## Recommended: Agent-led 7+2 standardization
+
 
 Facetide is **not** an additional cognition engine. The host LLM calls any
 connected StateBar-MCP, MR-MEM / ATLAS and specialist MCP tools, interprets
@@ -28,14 +63,12 @@ standardized 7+2 review draft.
 
 The normative workflow is [Agent Handoff v1](docs/agent-handoff-v1.md).
 
-- `facetide_agent_brief`: returns previous confirmed review, user goals,
-  machine-readable JSON Schema and accurate external MCP usage instructions.
-- `facetide_stage_agent_review`: records exactly seven domain observations,
-  two unscored axes, why those observations matter to this user and their
-  provider-scoped evidence IDs. No subjective score is written.
-- `facetide_get_agent_review`: returns the staged, explicitly provisional draft.
-- `facetide_confirm_agent_review`: links an explicitly user-approved draft to
-  an immutable review with optional user-provided 1–5 ratings.
+- `facetide_context`: returns previous confirmed review, user goals,
+  machine-readable JSON Schema and the latest staged draft.
+- `facetide_draft`: stages exactly seven domain observations and two unscored
+  axes with provider-scoped sources and explicit value-judgment attribution.
+- `facetide_confirm`: links the explicitly approved draft to an immutable
+  review containing the user's own optional 1–5 ratings.
 
 Existing `facetide_compile_batch` and `facetide_compile_state_report`
 are retained for backward compatibility, **not the recommended Agent workflow**.
