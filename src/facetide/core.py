@@ -176,6 +176,21 @@ class LifeStore:
                     imported_at TEXT NOT NULL,
                     PRIMARY KEY(source_type, source_ref)
                 );
+                CREATE TABLE IF NOT EXISTS agent_handoff_drafts (
+                    id TEXT PRIMARY KEY,
+                    period_start TEXT NOT NULL,
+                    period_end TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    body_json TEXT NOT NULL,
+                    body_hash TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS ix_agent_handoff_period
+                  ON agent_handoff_drafts(period_start, period_end, created_at DESC);
+                CREATE TABLE IF NOT EXISTS agent_review_links (
+                    review_id TEXT PRIMARY KEY REFERENCES reviews(id),
+                    draft_id TEXT NOT NULL REFERENCES agent_handoff_drafts(id),
+                    draft_hash TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS state_reports (
                     id TEXT PRIMARY KEY,
                     period_start TEXT NOT NULL,
@@ -390,6 +405,31 @@ class LifeStore:
         from .state import StateSynthesis
         return StateSynthesis(self).get_latest(period_start, period_end)
 
+    def agent_brief(self, period_start: str, period_end: str) -> dict:
+        """Give the host LLM a structured task contract, not an AI service."""
+        from .handoff import AgentHandoff
+        return AgentHandoff(self).brief(period_start, period_end)
+
+    def stage_agent_review(self, *, period_start: str, period_end: str,
+                           evidence: list[dict], domains: list[dict],
+                           axes: list[dict], agent_note: str = "") -> dict:
+        from .handoff import AgentHandoff
+        return AgentHandoff(self).stage(period_start, period_end, evidence, domains, axes, agent_note)
+
+    def get_agent_review(self, period_start: str, period_end: str) -> dict:
+        from .handoff import AgentHandoff
+        return AgentHandoff(self).get(period_start, period_end)
+
+    def confirm_agent_review(self, *, draft_id: str, expected_hash: str,
+                             domain_scores: dict[str,int], user_confirmed: bool,
+                             user_notes: str = "", personal_growth: str | None = None,
+                             self_realization: str | None = None,
+                             revision_of: str | None = None) -> dict:
+        from .handoff import AgentHandoff
+        return AgentHandoff(self).confirm(
+            draft_id, expected_hash, domain_scores, user_confirmed,
+            user_notes, personal_growth, self_realization, revision_of)
+
     def prepare_review(self, period_start: str, period_end: str) -> dict:
         """Project existing memory/metrics into seven evidence cards and two narrative axes.
 
@@ -411,6 +451,7 @@ class LifeStore:
             "period_start": period_start, "period_end": period_end,
             "previous_review": previous, "goals": goals, "evidence": items,
             "state_report": state_report,
+            "agent_handoff": self.get_agent_review(period_start, period_end),
             "domain_cards": list(assembled["domains"].values()),
             "axis_drafts": assembled["axes"],
             "change_candidates": assembled["change_candidates"],
@@ -420,10 +461,11 @@ class LifeStore:
             "stale_annotations": assembled["stale_annotations"],
             "warnings": warnings,
             "guidance": (
-                "Host Agent: compile outstanding source-backed evidence first. "
-                "All seven domains contain evidence projections, never inferred "
-                "satisfaction ratings. Two axes are editable, unscored narrative drafts. "
-                "User must confirm final interpretations and scores."
+                "Default: host LLM calls facetide_agent_brief, then submits its "
+                "source-grounded 7+2 draft using facetide_stage_agent_review. "
+                "Facetide itself does not semantically infer values or scores. "
+                "Old compilation cards are an optional compatibility view; "
+                "only the user can confirm final interpretations and ratings."
             )
         }
 

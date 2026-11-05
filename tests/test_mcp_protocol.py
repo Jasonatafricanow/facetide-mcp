@@ -26,7 +26,9 @@ class MCPProtocolTest(unittest.TestCase):
                     self.assertTrue({"facetide_get_snapshot", "facetide_prepare_review",
                         "facetide_save_review", "facetide_upsert_goal", "facetide_get_history",
                         "facetide_get_compilation_batch", "facetide_compile_batch", "facetide_publish_source_bundle",
-                        "facetide_get_state_context", "facetide_compile_state_report", "facetide_get_state_report"} <= tool_names)
+                        "facetide_get_state_context", "facetide_compile_state_report", "facetide_get_state_report",
+                        "facetide_agent_brief", "facetide_stage_agent_review",
+                        "facetide_get_agent_review", "facetide_confirm_agent_review"} <= tool_names)
                     result = await session.call_tool("facetide_get_snapshot", {})
                     self.assertFalse(result.isError)
                     # JSON result may appear in structuredContent on newer SDKs.

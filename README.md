@@ -4,7 +4,7 @@
 
 Facetide does not calculate a happiness score, replace your memory system, or require daily check-ins. It organizes existing evidence for periodic reflection; only the user decides whether a domain is satisfying, what counts as enough, and whether a goal is worth continuing.
 
-## Current version: 0.4.0 — Longitudinal life-state synthesis
+## Current version: 0.5.0 — Agent-led standard handoff
 
 In addition to the MCP protocol, v0.2 includes a **local four-view workbench** with a seven-sector wheel, guided period reviews, selected evidence refs, goal lifecycle editor and immutable history.
 
@@ -19,7 +19,29 @@ See [Product workbench and MR-Mem setup](docs/product-workbench.md). The UI and 
 
 **Optional native read-only MR-Mem AML adapter:** specify both `FACETIDE_MRMEM_DIR` and `FACETIDE_MRMEM_USER_ID`. It projects verified canonical memories from existing `memory.sqlite` and `aml_source.sqlite` with scoped fingerprints, no runtime migrations. Missing life-domain classification is left unclassified, not fabricated. This adapter has synthetic-contract tests but not live-production validation.
 
-## Longitudinal state: beyond seven classified event lists
+## Recommended: Agent-led 7+2 standardization
+
+Facetide is **not** an additional cognition engine. The host LLM calls any
+connected StateBar-MCP, MR-MEM / ATLAS and specialist MCP tools, interprets
+the conversation using the user's expressed values, then submits one
+standardized 7+2 review draft.
+
+The normative workflow is [Agent Handoff v1](docs/agent-handoff-v1.md).
+
+- `facetide_agent_brief`: returns previous confirmed review, user goals,
+  machine-readable JSON Schema and accurate external MCP usage instructions.
+- `facetide_stage_agent_review`: records exactly seven domain observations,
+  two unscored axes, why those observations matter to this user and their
+  provider-scoped evidence IDs. No subjective score is written.
+- `facetide_get_agent_review`: returns the staged, explicitly provisional draft.
+- `facetide_confirm_agent_review`: links an explicitly user-approved draft to
+  an immutable review with optional user-provided 1–5 ratings.
+
+Existing `facetide_compile_batch` and `facetide_compile_state_report`
+are retained for backward compatibility, **not the recommended Agent workflow**.
+Their semantic pipeline should not be required in a normal Facetide integration.
+
+## Legacy experimental longitudinal state synthesis
 
 The optional host Agent can now compile a **whole-period state** after source classification. Use `facetide_get_state_context` to obtain cited domain evidence, a prior state baseline, goals and a source-sensitive context token. The Agent then calls `facetide_compile_state_report` with exactly seven domain states and two unscored narrative axes. Each domain can distinguish observed/partial/unobserved evidence, current condition, cautious direction of change, reason, confidence, goal strain, cross-domain tradeoffs and one targeted follow-up question. Without a verified prior baseline, the service rejects invented improvement/decline/stability claims.
 

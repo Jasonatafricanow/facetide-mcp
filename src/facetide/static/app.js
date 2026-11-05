@@ -71,11 +71,12 @@ function renderOverview(){
  }
  $('domainCards').innerHTML=domainMeta.map(([id,name,icon,desc])=>{
   const score=scores[id],goals=s.goals.filter(g=>g.domain_ids.includes(id)).length;
+  const handoffDomain=state.context?.agent_handoff?.draft?.domains?.find(d=>d.domain_id===id);
   const card=(state.context?.domain_cards||[]).find(c=>c.domain_id===id);
   const proposed=state.context?.state_report?.validation?.valid?
     state.context.state_report.report?.domains?.find(d=>d.domain_id===id):null;
   const evidence=card?.evidence?.[0];
-  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${Number.isInteger(score)?score:'—'} <small>/ 5</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><p class="observed-mini">${proposed?.picture?escapeHtml(proposed.picture):evidence?escapeHtml(evidence.summary):'本期暂无相关证据'} <small>${proposed?'Agent 状态草稿 · '+escapeHtml(proposed.coverage):evidence?'来源：'+escapeHtml(evidence.source_type)+' · 未确认':'未知不等于退步'}</small></p><div class="bar"><span style="width:${Number.isInteger(score)?score*20:0}%"></span></div></article>`;
+  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${Number.isInteger(score)?score:'—'} <small>/ 5</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><p class="observed-mini">${handoffDomain?.observation?escapeHtml(handoffDomain.observation):proposed?.picture?escapeHtml(proposed.picture):evidence?escapeHtml(evidence.summary):'本期暂无相关证据'} <small>${handoffDomain?'Agent 标准草稿 · 未确认':proposed?'Agent 状态草稿 · 未确认':evidence?'来源：'+escapeHtml(evidence.source_type)+' · 未确认':'未知不等于退步'}</small></p><div class="bar"><span style="width:${Number.isInteger(score)?score*20:0}%"></span></div></article>`;
  }).join('');
 }
 function renderRatingRows(previous={}){
@@ -93,6 +94,39 @@ function refreshRatingState(){
   row.querySelectorAll('[data-value]').forEach(btn=>{const on=Number(btn.dataset.value)===v;btn.classList.toggle('selected',on);btn.setAttribute('aria-pressed',String(on))});
  });
 }
+
+function renderHandoffDraft(draft){
+ const basis={
+   user_explicit:'用户表达（由 Agent 标注）',
+   user_confirmed_history:'既往已确认（由 Agent 标注）',
+   agent_hypothesis:'Agent 推测 · 尚待核实',
+   unknown:'价值依据未知'
+ };
+ $('stateReport').innerHTML='<div class="state-title">Agent 标准化 7+2 草稿 <small>未确认 · 来源由宿主 Agent 转交</small></div>'+
+   '<div class="state-domains">'+draft.domains.map(d=>{
+     const val=d.meaning||{};
+     const how=val.assessment!=='uncertain'
+       ?`<p class="meaning">为什么值得或不值得：${escapeHtml(val.why)}<small>${escapeHtml(basis[val.basis]||val.basis)} · ${escapeHtml(val.assessment)}</small></p>`:'';
+     return `<div class="state-item"><div class="state-item-head"><b>${escapeHtml(dname(d.domain_id))}</b><span>${escapeHtml(d.coverage)}</span></div>
+       <p>${escapeHtml(d.observation||'暂无证据，不能据此判断')}</p>${how}
+       ${d.question?`<small class="state-question">待核实：${escapeHtml(d.question)}</small>`:''}
+       <small class="source-label">引用：${escapeHtml(d.evidence_refs.join('、')||'无')}</small></div>`;
+   }).join('')+'</div>';
+ $('evidenceList').innerHTML=draft.evidence.map(e=>`<div class="evidence"><div>
+   <strong>${escapeHtml(e.summary)}</strong>
+   <small>${escapeHtml(e.provider)} · ${escapeHtml(e.source_tool)} · ${escapeHtml(e.source_ref)}</small>
+   <small>${escapeHtml(e.status)} / ${escapeHtml(e.kind)} · 有效至：${escapeHtml(e.valid_until||'来源未指定')}</small>
+ </div></div>`).join('')||'<div class="empty">没有相关来源</div>';
+ $('evidenceCount').textContent=draft.evidence.length+' 条 Agent 来源';
+ $('compiledDomains').innerHTML='<div class="empty">标准化解释已显示在上方；无需再由 Facetide 进行内部语义编译。</div>';
+ $('compilationStatus').textContent='Agent 标准草稿';
+ $('compilationWarnings').textContent='来源 ID 与语义解释由宿主 Agent 提供；Facetide 不独立核实上游事实，也不推断主观满意度。';
+ for(const [axis,field] of [['personal_growth','growthInput'],['self_realization','realizationInput']]){
+   const item=draft.axes.find(x=>x.axis===axis);
+   $(field).value=item?.status==='proposed'?item.narrative:'';
+ }
+}
+
 function renderContext(ctx){
  state.context=ctx;
  const previous=ctx.previous_review;
@@ -151,6 +185,7 @@ function renderContext(ctx){
  ['new','stable','receding'].forEach((type,index)=>{
   $(['changeNew','changeStable','changeReceding'][index]).value=(ctx.change_candidates[type]||[]).slice(0,3).map(e=>e.summary).join('\n');
  });
+ if(ctx.agent_handoff?.draft)renderHandoffDraft(ctx.agent_handoff.draft);
 }
 async function loadContext(){
  try{
@@ -177,8 +212,23 @@ async function saveReview(){
   evidence_refs:refs,personal_growth:$('growthInput').value,self_realization:$('realizationInput').value,
   user_notes:$('reviewNote').value,user_confirmed:true};
  if(state.revisionOf)data.revision_of=state.revisionOf;
- try{await post('/api/reviews',data);toast('复盘已保存，历史不会被静默修改。');state.revisionOf=null;await reload();nav('history')}
- catch(e){toast(e.message,true)}
+ try{
+   const draft=state.context.agent_handoff?.draft;
+   if(draft){
+     const approved={
+       draft_id:draft.draft_id,expected_hash:draft.draft_hash,
+       domain_scores:state.ratings,user_confirmed:true,
+       personal_growth:$('growthInput').value,self_realization:$('realizationInput').value,
+       user_notes:$('reviewNote').value
+     };
+     if(state.revisionOf)approved.revision_of=state.revisionOf;
+     await post('/api/agent-confirm',approved);
+   }else{
+     await post('/api/reviews',data);
+   }
+   toast('复盘已确认并保存。');
+   state.revisionOf=null;await reload();nav('history');
+ }catch(e){toast(e.message,true)}
 }
 function renderGoalOptions(){
  $('goalDomains').innerHTML=domainMeta.map(([id,name])=>`<label><input type="checkbox" value="${id}"> ${name}</label>`).join('');
