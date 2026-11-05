@@ -167,7 +167,7 @@ class LongitudinalTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.compile("2026-10-01","2026-10-31",reports,self.axes(["career-oct"]))
         reports=self.payload("career-oct","health-oct")
-        reports[1]["coverage"]="unobserved"
+        reports[0]["coverage"]="unobserved"
         with self.assertRaises(ValidationError):
             self.compile("2026-10-01","2026-10-31",reports,self.axes(["career-oct"]))
         with self.assertRaises(ValidationError):
