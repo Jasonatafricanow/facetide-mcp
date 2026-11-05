@@ -56,11 +56,11 @@ function renderOverview(){
  $('growthAxis').textContent=r?.personal_growth||'尚无记录';
  $('realizationAxis').textContent=r?.self_realization||'尚无已确认记录';
  if(!r?.personal_growth){
-   const candidates=state.context?.axis_drafts?.personal_growth?.insights?.filter(x=>x.kind==='cross_event_inference');
+   const candidates=state.context?.axis_drafts?.personal_growth?.insights;
    if(candidates?.length)$('growthAxis').textContent='Agent 未确认草稿：'+candidates[0].summary;
  }
  if(!r?.self_realization){
-   const candidates=state.context?.axis_drafts?.self_realization?.insights?.filter(x=>x.kind==='cross_event_inference');
+   const candidates=state.context?.axis_drafts?.self_realization?.insights;
    if(candidates?.length)$('realizationAxis').textContent='Agent 未确认草稿：'+candidates[0].summary;
  }
  $('domainCards').innerHTML=domainMeta.map(([id,name,icon,desc])=>{
@@ -97,6 +97,33 @@ function renderContext(ctx){
   `<label class="evidence"><input type="checkbox" data-evidence="${i}" ${e.resolution_status==='active'?'':'disabled'}><div><strong>${escapeHtml(e.summary||'[无可用摘要]')}</strong><small>${escapeHtml(e.source_type)} · ${escapeHtml(e.evidence_kind)} · 发生：${escapeHtml(e.occurred_at)} · 获知：${escapeHtml(e.known_at||'未知')}</small><small>关联：${e.domain_ids.map(dname).join('、')||'待归类'} · ${escapeHtml(e.resolution_status)} · ${escapeHtml(e.source_ref)}</small></div></label>`).join(''):
   '<div class="empty">本期没有可用证据。缺失不是退步；可以手动复盘。</div>';
  $('warnings').textContent=(ctx.warnings||[]).slice(0,6).join('\n');
+ const stats=ctx.compilation||{};
+ $('compilationStatus').textContent=(stats.compiled_items||0)+' / '+(stats.active_items||0)+' 条已编译';
+ $('compiledDomains').innerHTML=(ctx.domain_cards||[]).map(card=>{
+   const list=(card.evidence||[]).slice(0,5).map(e=>
+     `<li><span>${escapeHtml(e.summary)}</span><small>${escapeHtml(e.source_type)} / ${escapeHtml(e.source_ref)} · ${escapeHtml(e.classification)} · ${escapeHtml(e.confidence||'来源标注')}</small></li>`).join('');
+   return `<div class="compiled-card"><div class="compiled-card-top"><b>${dname(card.domain_id)}</b><small>${card.total_evidence||0} 条证据 · ${escapeHtml(card.status)}</small></div>${list?`<ul>${list}</ul>`:'<p class="soft">本期没有足够相关证据，不等于生活退步。</p>'}</div>`;
+ }).join('');
+ $('compilationWarnings').textContent=(stats.pending||0)?
+   `尚有 ${stats.pending} 条来源记录等待 Agent 分类。可在连接的 Agent 中运行 facetide_reflection_guide；刷新本期后查看。`:
+   (stats.unclassified||0)?`已处理记录中有 ${stats.unclassified} 条与七个领域无关或证据不足。`:'';
+ for(const [axis,field] of [['personal_growth','growthInput'],['self_realization','realizationInput']]){
+   const all=ctx.axis_drafts?.[axis]?.insights||[];
+   const proposals=all.filter(x=>x.kind==='cross_event_inference');
+   const picked=proposals.length?proposals:all;
+   if(picked.length)$(field).value=picked.slice(0,4).map(x=>x.summary).join('\n');
+ }
+ const selected=new Set((ctx.domain_cards||[]).flatMap(card=>(card.evidence||[])
+   .filter(e=>e.classification==='agent_compiled').map(e=>e.source_type+'::'+e.source_ref)));
+ for(const group of Object.values(ctx.axis_drafts||{})){
+   for(const insight of group.insights||[]){
+     for(const ref of insight.evidence_refs||[])selected.add(ref.source_type+'::'+ref.source_ref);
+   }
+ }
+ document.querySelectorAll('#evidenceList input[data-evidence]').forEach(el=>{
+   const e=ctx.evidence[Number(el.dataset.evidence)];
+   el.checked=!el.disabled&&selected.has(e.source_type+'::'+e.source_ref);
+ });
  ['new','stable','receding'].forEach((type,index)=>{
   $(['changeNew','changeStable','changeReceding'][index]).value=(ctx.change_candidates[type]||[]).slice(0,3).map(e=>e.summary).join('\n');
  });
