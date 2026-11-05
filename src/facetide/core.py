@@ -461,10 +461,11 @@ class LifeStore:
             "stale_annotations": assembled["stale_annotations"],
             "warnings": warnings,
             "guidance": (
-                "Host Agent: compile outstanding source-backed evidence first. "
-                "All seven domains contain evidence projections, never inferred "
-                "satisfaction ratings. Two axes are editable, unscored narrative drafts. "
-                "User must confirm final interpretations and scores."
+                "Default: host LLM calls facetide_agent_brief, then submits its "
+                "source-grounded 7+2 draft using facetide_stage_agent_review. "
+                "Facetide itself does not semantically infer values or scores. "
+                "Old compilation cards are an optional compatibility view; "
+                "only the user can confirm final interpretations and ratings."
             )
         }
 

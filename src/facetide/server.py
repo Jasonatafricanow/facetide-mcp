@@ -47,9 +47,11 @@ def facetide_publish_source_bundle(records: list[dict]) -> dict:
 def facetide_get_compilation_batch(
     period_start: str, period_end: str, offset: int = 0, limit: int = 25,
 ) -> dict:
-    """Fetch a bounded batch of source-backed memories/metrics to classify.
+    """LEGACY OPTIONAL: fetch a batch for the old compilation workflow.
 
-    For each active item, the host Agent must assign 0..7 relevant life domains,
+    Default Facetide integrations should use facetide_agent_brief and
+    facetide_stage_agent_review instead; no internal compilation is required.
+    If this legacy tool is explicitly used, the Agent can assign 0..7 domains,
     optional narrative axes, a grounded observation, change and uncertainty.
     Fetch all pages via next_offset; do not silently drop uncategorized records.
     After classification call facetide_compile_batch with the same offset, limit,
@@ -64,7 +66,7 @@ def facetide_compile_batch(
     offset: int, limit: int, batch_fingerprint: str,
     annotations: list[dict], axis_insights: list[dict] | None = None,
 ) -> dict:
-    """Commit provisional 7+2 SEMANTIC PROJECTIONS over cited source records.
+    """LEGACY OPTIONAL: persist old per-event semantic projection metadata.
 
     Requires exactly one annotation for every active record from the batch.
     Each annotation: {source_type,source_ref,domain_ids:[...],axis_ids:[...],
@@ -145,11 +147,11 @@ def facetide_confirm_agent_review(
 
 @mcp.tool()
 def facetide_get_state_context(period_start: str, period_end: str) -> dict:
-    """Read a whole-life baseline with seven observed domains and two narrative axes.
+    """LEGACY OPTIONAL: obtain context for the experimental state compiler.
 
-    Provides the context_token, current domain evidence, prior state report, and
-    user-defined goals. The host Agent MUST use this before drafting a period
-    state synthesis. Do not infer score changes from event counts.
+    Standard Agent integrations should use facetide_agent_brief instead.
+    This returns the legacy context_token and prior state report.
+    Do not infer score changes from event counts.
     """
     return LifeStore().get_state_context(period_start, period_end)
 
@@ -159,7 +161,9 @@ def facetide_compile_state_report(
     period_start: str, period_end: str, context_token: str,
     domains: list[dict], axes: list[dict],
 ) -> dict:
-    """Compile a provisional, append-only longitudinal state assessment.
+    """LEGACY OPTIONAL: store experimental longitudinal state proposals.
+
+    This is not required by Facetide Agent Handoff v1.
 
     EXACTLY seven domain objects with keys:
     domain_id, coverage: observed|partial|unobserved,
@@ -181,7 +185,7 @@ def facetide_compile_state_report(
 
 @mcp.tool()
 def facetide_get_state_report(period_start: str, period_end: str) -> dict:
-    """Read latest proposed 7+2 period state and check its live source citations.
+    """LEGACY OPTIONAL: read old state compiler proposals and source integrity.
 
     A stale report must NOT be presented as current evidence.
     """
