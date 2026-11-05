@@ -80,6 +80,16 @@ class HostBridgeTest(unittest.TestCase):
             self.store.publish_source_bundle([self.event(),self.event(provider="bank")])
         self.assertEqual(self.store.prepare_review("2026-10-01","2026-10-31")["evidence"],[])
 
+    def test_narrowing_allowlist_hides_other_providers(self):
+        self.store.publish_source_bundle([
+            self.event(provider="calendar"),
+            self.event(provider="github", source_ref="issue-02"),
+        ])
+        with patch.dict(os.environ, {"FACETIDE_BRIDGE_ALLOWED_SOURCES": "github"}):
+            narrowed = LifeStore(self.path)
+            items = narrowed.prepare_review("2026-10-01", "2026-10-31")["evidence"]
+            self.assertEqual([x["source_type"] for x in items], ["bridge:github"])
+
     def test_explicit_opt_in_required_even_for_existing_data(self):
         self.store.publish_source_bundle([self.event()])
         with patch.dict(os.environ, {"FACETIDE_BRIDGE_ALLOWED_SOURCES": ""}):

@@ -110,8 +110,9 @@ class HostBridgeSource:
     provider's original records must remain under its own data authority.
     """
 
-    def __init__(self, db_path: str | Path):
+    def __init__(self, db_path: str | Path, allowed_providers: set[str]):
         self.db_path = Path(db_path)
+        self.allowed_providers = {p.strip().lower() for p in allowed_providers}
 
     def query(self, period_start, period_end, domains):
         import sqlite3
@@ -121,6 +122,11 @@ class HostBridgeSource:
         for (raw,) in rows:
             try:
                 item = normalize_evidence(json.loads(raw), domains)
+                # Revoking a subset of provider permissions immediately hides
+                # previously cached events from that provider.
+                provider = item["source_type"].removeprefix("bridge:")
+                if not item["source_type"].startswith("bridge:") or provider not in self.allowed_providers:
+                    continue
                 if period_start <= calendar_date(item["occurred_at"]) <= period_end:
                     result.append(item)
             except (TypeError, ValueError, KeyError) as exc:

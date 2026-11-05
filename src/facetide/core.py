@@ -104,8 +104,10 @@ class LifeStore:
                 sources.append(JsonlSource(evidence_file))
             # New provider types need no native adapter. A configured source
             # allowlist is explicit opt-in to temporary host projections.
-            if os.environ.get("FACETIDE_BRIDGE_ALLOWED_SOURCES", "").strip():
-                sources.append(HostBridgeSource(self.path))
+            bridge_allowlist = {p.strip().lower() for p in os.environ.get(
+                "FACETIDE_BRIDGE_ALLOWED_SOURCES", "").split(",") if p.strip()}
+            if bridge_allowlist:
+                sources.append(HostBridgeSource(self.path, bridge_allowlist))
             self.source = CompositeSource(sources) if sources else EmptySource()
         self._initialize()
 
