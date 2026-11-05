@@ -129,13 +129,19 @@ function editGoal(id){
  state.goalId=g.goal_id;state.goalVersion=g.version;
  $('goalTitle').value=g.title;$('goalEnough').value=g.enough_condition;$('goalStatus').value=g.status;
  $('goalDomains').querySelectorAll('input').forEach(el=>el.checked=g.domain_ids.includes(el.value));
- $('goalFormTitle').textContent='修改目标 · 当前版本 '+g.version;nav('goals');
+ $('goalFormTitle').textContent='修改目标 · 当前版本 '+g.version;
+  $('goalOutcome').value=(g.indicators?.outcome||[]).join('\n');
+  $('goalDriver').value=(g.indicators?.driver||[]).join('\n');
+  $('goalGuardrail').value=(g.indicators?.guardrail||[]).join('\n');
+  nav('goals');
 }
 function renderGoals(){
  const goals=state.snapshot.goals,states={building:'建设',maintaining:'维持',reflecting:'反思',simplifying:'精简'};
  $('goalCount').textContent=goals.length+' 个目标';
  $('goalList').innerHTML=goals.length?goals.map(g=>
-  `<article class="panel goal-card"><div class="state">${states[g.status]||g.status} · V${g.version}</div><h3>${escapeHtml(g.title)}</h3><p><b>怎样算够了：</b>${escapeHtml(g.enough_condition)}</p><div class="tags">${g.domain_ids.map(d=>`<span>${dname(d)}</span>`).join('')}</div><div class="card-foot"><small class="soft">最后修改：${escapeHtml(g.updated_at.slice(0,10))}</small><button data-edit="${escapeHtml(g.goal_id)}">修改目标 / 状态</button></div></article>`).join(''):
+  `<article class="panel goal-card"><div class="state">${states[g.status]||g.status} · V${g.version}</div><h3>${escapeHtml(g.title)}</h3><p><b>怎样算够了：</b>${escapeHtml(g.enough_condition)}</p><div class="tags">${g.domain_ids.map(d=>`<span>${dname(d)}</span>`).join('')}</div>
+  <div class="indicator-summary">${[['outcome','结果'],['driver','驱动'],['guardrail','护栏']].map(([kind,label])=>
+   (g.indicators?.[kind]||[]).length?`<div><b>${label}：</b>${escapeHtml(g.indicators[kind].join('；'))}</div>`:'').join('')}</div><div class="card-foot"><small class="soft">最后修改：${escapeHtml(g.updated_at.slice(0,10))}</small><button data-edit="${escapeHtml(g.goal_id)}">修改目标 / 状态</button></div></article>`).join(''):
   '<div class="empty">暂时没有目标，不必强行为每个领域安排任务。</div>';
  document.querySelectorAll('[data-edit]').forEach(el=>el.addEventListener('click',()=>editGoal(el.dataset.edit)));
 }
@@ -143,13 +149,39 @@ async function saveGoal(e){
  e.preventDefault();
  const domains=Array.from($('goalDomains').querySelectorAll('input:checked')).map(el=>el.value);
  if(!domains.length){toast('至少关联一个领域。',true);return}
- const payload={title:$('goalTitle').value,enough_condition:$('goalEnough').value,
-  domain_ids:domains,status:$('goalStatus').value,user_confirmed:true};
+ const indicators={};
+  for(const [key,id] of [['outcome','goalOutcome'],['driver','goalDriver'],['guardrail','goalGuardrail']]){
+    const parts=lines(id);if(parts.length)indicators[key]=parts;
+  }
+  const payload={title:$('goalTitle').value,enough_condition:$('goalEnough').value,
+  domain_ids:domains,status:$('goalStatus').value,indicators,user_confirmed:true};
  if(state.goalId){payload.goal_id=state.goalId;payload.expected_version=state.goalVersion}
  try{await post('/api/goals',payload);resetGoal();await reload();toast('目标已更新。')}
  catch(err){toast(err.message,true)}
 }
+function renderTrend(){
+ const id=$('trendDomain').value;
+ const unique=new Map();
+ for(const review of state.history){
+   const key=review.period_start+'|'+review.period_end;
+   if(!unique.has(key))unique.set(key,review);
+ }
+ const points=[...unique.values()].sort((a,b)=>a.period_end.localeCompare(b.period_end)).slice(-12);
+ if(!points.length){$('trendChart').innerHTML='<div class="empty">暂无已确认的评分记录。</div>';return}
+ const W=760,H=230,margin={left:48,right:25,top:20,bottom:43};
+ const plot=W-margin.left-margin.right,plotHeight=H-margin.top-margin.bottom;
+ const x=i=>margin.left+plot*(points.length===1?.5:i/(points.length-1));
+ const y=v=>margin.top+(5-v)*plotHeight/4;
+ const grid=[1,2,3,4,5].map(v=>`<line x1="${margin.left}" y1="${y(v)}" x2="${W-margin.right}" y2="${y(v)}" stroke="#e5eee8"/><text x="${margin.left-18}" y="${y(v)+4}" text-anchor="middle" font-size="12" fill="#8da596">${v}</text>`).join('');
+ const bars=points.map((p,i)=>{
+  const value=p.domain_scores[id],px=x(i),label=p.period_end.slice(5),base=y(1);
+  const dot=Number.isInteger(value)?`<line x1="${px}" y1="${base}" x2="${px}" y2="${y(value)}" stroke="#8fbea3" stroke-width="7" stroke-linecap="round" opacity=".8"/><circle cx="${px}" cy="${y(value)}" r="5" fill="#397d62"/><text x="${px}" y="${y(value)-13}" text-anchor="middle" font-size="12" font-weight="700" fill="#386b58">${value}</text>`: `<circle cx="${px}" cy="${base}" r="3" fill="#d1dbd3"/>`;
+  return dot+`<text x="${px}" y="${H-15}" text-anchor="middle" font-size="10.5" fill="#82958b">${escapeHtml(label)}</text>`;
+ }).join('');
+ $('trendChart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${escapeHtml(dname(id))}的阶段评分图">${grid}${bars}</svg>`;
+}
 function renderHistory(){
+ renderTrend();
  $('historyList').innerHTML=state.history.length?state.history.map(r=>
  `<article class="panel history-card"><div class="eyebrow">${escapeHtml(r.period_start)} — ${escapeHtml(r.period_end)}</div><h3>阶段快照 ${r.revision_of?'· 修订版':''}</h3>
  <div class="tags">${domainMeta.filter(d=>Number.isInteger(r.domain_scores[d[0]])).map(d=>`<span>${d[1]} ${r.domain_scores[d[0]]}/5</span>`).join('')||'<span>叙事复盘</span>'}</div>
@@ -187,6 +219,8 @@ async function init(){
   const dateText=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
   $('startDate').value=dateText(from);$('endDate').value=dateText(now);
   renderGoalOptions();renderRatingRows();
+  $('trendDomain').innerHTML=domainMeta.map(([id,name])=>`<option value="${id}">${name}</option>`).join('');
+  $('trendDomain').addEventListener('change',renderTrend);
   document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.page)));
   document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.go)));
   $('loadContext').addEventListener('click',loadContext);

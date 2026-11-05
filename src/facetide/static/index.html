@@ -35,9 +35,16 @@
 <form id="goalForm"><label>目标是什么<input required id="goalTitle" maxlength="200" placeholder="例如：改善作息"></label>
 <label>达到什么程度算“够了”<textarea required id="goalEnough" maxlength="2000" rows="3" placeholder="用你自己的标准定义结束条件"></textarea></label>
 <div class="field-label">关联生活领域（可多选）</div><div id="goalDomains" class="chips"></div>
+<div class="indicator-fields">
+<label>结果指标（可选，每行一项）<textarea id="goalOutcome" rows="2" placeholder="如何判断够了"></textarea></label>
+<label>驱动指标（可选，每行一项）<textarea id="goalDriver" rows="2" placeholder="一两项真正有杠杆的动作"></textarea></label>
+<label>护栏指标（可选，每行一项）<textarea id="goalGuardrail" rows="2" placeholder="哪些生活不应因此受损"></textarea></label>
+</div>
 <label>目标状态<select id="goalStatus"><option value="building">建设：还未达到</option><option value="maintaining">维持：已经足够</option><option value="reflecting">反思：重新判断价值</option><option value="simplifying">精简：降低投入</option></select></label>
 <div class="save-row"><button type="button" id="resetGoal" class="secondary">取消编辑</button><button type="submit" class="primary">确认保存目标</button></div></form></article>
 <div><div class="section-title compact"><h2>当前目标</h2><span id="goalCount"></span></div><div id="goalList" class="goal-list"></div></div></div></section>
-<section class="page" id="page-history"><div class="hero"><div><div class="eyebrow">CONTINUITY & CHANGE</div><h1>看见自己走过的轨迹。</h1><p>历史评价属于当时的你，后来的修订不会删除过去。</p></div></div><div id="historyList" class="history-list"></div></section>
+<section class="page" id="page-history"><div class="hero"><div><div class="eyebrow">CONTINUITY & CHANGE</div><h1>看见自己走过的轨迹。</h1><p>历史评价属于当时的你，后来的修订不会删除过去。</p></div></div>
+<div class="panel trend-panel"><div class="panel-heading">领域评分轨迹 <span class="pill">仅本人评价</span></div><label>查看领域 <select id="trendDomain"></select></label><div id="trendChart" class="trend-chart"></div><p class="soft">未评价的阶段不填零、不做平滑或推断。修订期使用该期最新确认版本显示，原始版本仍保留在下方。</p></div>
+<div id="historyList" class="history-list"></div></section>
 </div><footer>FACETIDE · LOCAL FIRST · 观察不等于干预 · v<span id="appVersion">0.2.0</span></footer></main></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div></body></html>

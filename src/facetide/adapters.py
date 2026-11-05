@@ -175,6 +175,7 @@ class NutritionMcpSource:
 
     async def _report(self, days):
         import os
+        import asyncio
         from mcp import ClientSession
         from mcp.client.streamable_http import streamablehttp_client
 
@@ -184,12 +185,13 @@ class NutritionMcpSource:
         args = {"view": "report", "days": days}
         if self.member_id:
             args["memberId"] = self.member_id
-        async with streamablehttp_client(
-            self.url, headers={"Authorization": f"Bearer {token}"}
-        ) as (reader, writer, _):
-            async with ClientSession(reader, writer) as session:
-                await session.initialize()
-                response = await session.call_tool("nutrition_query", arguments=args)
+        async with asyncio.timeout(18):
+            async with streamablehttp_client(
+                self.url, headers={"Authorization": f"Bearer {token}"}
+            ) as (reader, writer, _):
+                async with ClientSession(reader, writer) as session:
+                    await session.initialize()
+                    response = await session.call_tool("nutrition_query", arguments=args)
                 if response.isError:
                     raise ValueError("Nutrition MCP refused report query")
                 payload = response.structuredContent
