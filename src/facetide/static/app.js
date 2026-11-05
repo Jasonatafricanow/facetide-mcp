@@ -56,18 +56,26 @@ function renderOverview(){
  $('growthAxis').textContent=r?.personal_growth||'尚无记录';
  $('realizationAxis').textContent=r?.self_realization||'尚无已确认记录';
  if(!r?.personal_growth){
-   const candidates=state.context?.axis_drafts?.personal_growth?.insights;
+   const report=state.context?.state_report;
+   const axis=report?.validation?.valid?report.report?.axes?.find(x=>x.axis==='personal_growth'&&x.status==='proposed'):null;
+   if(axis)$('growthAxis').textContent='Agent 未确认草稿：'+axis.narrative;
+   const candidates=!axis?state.context?.axis_drafts?.personal_growth?.insights:null;
    if(candidates?.length)$('growthAxis').textContent='Agent 未确认草稿：'+candidates[0].summary;
  }
  if(!r?.self_realization){
-   const candidates=state.context?.axis_drafts?.self_realization?.insights;
+   const report=state.context?.state_report;
+   const axis=report?.validation?.valid?report.report?.axes?.find(x=>x.axis==='self_realization'&&x.status==='proposed'):null;
+   if(axis)$('realizationAxis').textContent='Agent 未确认草稿：'+axis.narrative;
+   const candidates=!axis?state.context?.axis_drafts?.self_realization?.insights:null;
    if(candidates?.length)$('realizationAxis').textContent='Agent 未确认草稿：'+candidates[0].summary;
  }
  $('domainCards').innerHTML=domainMeta.map(([id,name,icon,desc])=>{
   const score=scores[id],goals=s.goals.filter(g=>g.domain_ids.includes(id)).length;
   const card=(state.context?.domain_cards||[]).find(c=>c.domain_id===id);
+  const proposed=state.context?.state_report?.validation?.valid?
+    state.context.state_report.report?.domains?.find(d=>d.domain_id===id):null;
   const evidence=card?.evidence?.[0];
-  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${Number.isInteger(score)?score:'—'} <small>/ 5</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><p class="observed-mini">${evidence?escapeHtml(evidence.summary):'本期暂无相关证据'} <small>${evidence?'来源：'+escapeHtml(evidence.source_type)+' · 未确认':'未知不等于退步'}</small></p><div class="bar"><span style="width:${Number.isInteger(score)?score*20:0}%"></span></div></article>`;
+  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${Number.isInteger(score)?score:'—'} <small>/ 5</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><p class="observed-mini">${proposed?.picture?escapeHtml(proposed.picture):evidence?escapeHtml(evidence.summary):'本期暂无相关证据'} <small>${proposed?'Agent 状态草稿 · '+escapeHtml(proposed.coverage):evidence?'来源：'+escapeHtml(evidence.source_type)+' · 未确认':'未知不等于退步'}</small></p><div class="bar"><span style="width:${Number.isInteger(score)?score*20:0}%"></span></div></article>`;
  }).join('');
 }
 function renderRatingRows(previous={}){
@@ -97,6 +105,20 @@ function renderContext(ctx){
   `<label class="evidence"><input type="checkbox" data-evidence="${i}" ${e.resolution_status==='active'?'':'disabled'}><div><strong>${escapeHtml(e.summary||'[无可用摘要]')}</strong><small>${escapeHtml(e.source_type)} · ${escapeHtml(e.evidence_kind)} · 发生：${escapeHtml(e.occurred_at)} · 获知：${escapeHtml(e.known_at||'未知')}</small><small>关联：${e.domain_ids.map(dname).join('、')||'待归类'} · ${escapeHtml(e.resolution_status)} · ${escapeHtml(e.source_ref)}</small></div></label>`).join(''):
   '<div class="empty">本期没有可用证据。缺失不是退步；可以手动复盘。</div>';
  $('warnings').textContent=(ctx.warnings||[]).slice(0,6).join('\n');
+ const stateData=ctx.state_report||{},report=stateData.validation?.valid?stateData.report:null;
+ if(report){
+   const directions={initial:'初始观察',improved:'改善',stable:'稳定',declined:'退步',mixed:'有得有失',uncertain:'待判断'};
+   const coverage={observed:'有直接观察',partial:'证据不完整',unobserved:'证据不足'};
+   $('stateReport').innerHTML='<div class="state-title">阶段状态草稿 <small>Agent 解释 · 尚待本人确认</small></div>'+
+   '<div class="state-domains">'+report.domains.map(d=>{
+     const cross=(d.tradeoffs||[]).map(x=>`<p class="state-cross">跨领域关联 · ${dname(x.other_domain)}：${escapeHtml(x.claim)}</p>`).join('');
+     return `<div class="state-item"><div class="state-item-head"><b>${dname(d.domain_id)}</b><span>${escapeHtml(directions[d.direction]||d.direction)} · ${escapeHtml(coverage[d.coverage]||d.coverage)}</span></div><p>${escapeHtml(d.picture||'目前无法根据现有证据说明状态')}</p>${cross}${d.question?`<small class="state-question">待核实：${escapeHtml(d.question)}</small>`:''}</div>`;
+   }).join('')+'</div>';
+ }else if(stateData.report && !stateData.validation?.valid){
+   $('stateReport').innerHTML='<div class="empty">阶段状态草稿的来源已变化或撤销，旧结论失效。需要重新编译，不能直接沿用。</div>';
+ }else{
+   $('stateReport').innerHTML='<div class="empty">尚未生成跨时期状态解释。连接 Agent 调用 facetide_get_state_context / facetide_compile_state_report；单纯按领域分类的证据如下。</div>';
+ }
  const stats=ctx.compilation||{};
  $('compilationStatus').textContent=(stats.compiled_items||0)+' / '+(stats.active_items||0)+' 条已编译';
  $('compiledDomains').innerHTML=(ctx.domain_cards||[]).map(card=>{
@@ -108,6 +130,8 @@ function renderContext(ctx){
    `尚有 ${stats.pending} 条来源记录等待 Agent 分类。可在连接的 Agent 中运行 facetide_reflection_guide；刷新本期后查看。`:
    (stats.unclassified||0)?`已处理记录中有 ${stats.unclassified} 条与七个领域无关或证据不足。`:'';
  for(const [axis,field] of [['personal_growth','growthInput'],['self_realization','realizationInput']]){
+   const summary=report?.axes?.find(x=>x.axis===axis && x.status==='proposed');
+   if(summary){$(field).value=summary.narrative;continue}
    const all=ctx.axis_drafts?.[axis]?.insights||[];
    const proposals=all.filter(x=>x.kind==='cross_event_inference');
    const picked=proposals.length?proposals:all;

@@ -176,6 +176,18 @@ class LifeStore:
                     imported_at TEXT NOT NULL,
                     PRIMARY KEY(source_type, source_ref)
                 );
+                CREATE TABLE IF NOT EXISTS state_reports (
+                    id TEXT PRIMARY KEY,
+                    period_start TEXT NOT NULL,
+                    period_end TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    baseline_id TEXT REFERENCES state_reports(id),
+                    supersedes TEXT REFERENCES state_reports(id),
+                    body_json TEXT NOT NULL,
+                    source_hashes_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS ix_state_reports_period
+                   ON state_reports(period_end DESC, created_at DESC);
                 CREATE TABLE IF NOT EXISTS compiled_axes (
                     period_start TEXT NOT NULL,
                     period_end TEXT NOT NULL,
@@ -365,6 +377,19 @@ class LifeStore:
         return SemanticAssembler(self).compile_batch(
             period_start, period_end, offset, limit, batch_fingerprint, annotations, axis_insights)
 
+    def get_state_context(self, period_start: str, period_end: str) -> dict:
+        from .state import StateSynthesis
+        return StateSynthesis(self).get_context(period_start, period_end)
+
+    def compile_state_report(self, *, period_start: str, period_end: str,
+                             context_token: str, domains: list[dict], axes: list[dict]) -> dict:
+        from .state import StateSynthesis
+        return StateSynthesis(self).compile(period_start, period_end, context_token, domains, axes)
+
+    def get_state_report(self, period_start: str, period_end: str) -> dict:
+        from .state import StateSynthesis
+        return StateSynthesis(self).get_latest(period_start, period_end)
+
     def prepare_review(self, period_start: str, period_end: str) -> dict:
         """Project existing memory/metrics into seven evidence cards and two narrative axes.
 
@@ -381,9 +406,11 @@ class LifeStore:
                    ORDER BY period_end DESC, confirmed_at DESC, rowid DESC LIMIT 1""",
                 (period_start,)).fetchone())
             goals = self._goals(db)
+        state_report = self.get_state_report(period_start, period_end)
         return {
             "period_start": period_start, "period_end": period_end,
             "previous_review": previous, "goals": goals, "evidence": items,
+            "state_report": state_report,
             "domain_cards": list(assembled["domains"].values()),
             "axis_drafts": assembled["axes"],
             "change_candidates": assembled["change_candidates"],

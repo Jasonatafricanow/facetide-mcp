@@ -73,6 +73,10 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
                 q = parse_qs(req.query)
                 return self.reply(200, self.server.store.prepare_review(
                     q.get("start", [""])[0], q.get("end", [""])[0]))
+            if req.path == "/api/state":
+                q = parse_qs(req.query)
+                return self.reply(200, self.server.store.get_state_report(
+                    q.get("start", [""])[0], q.get("end", [""])[0]))
             if req.path in ASSETS:
                 name, mime = ASSETS[req.path]
                 return self.reply(200, files("facetide").joinpath("static", name).read_bytes(), mime)
