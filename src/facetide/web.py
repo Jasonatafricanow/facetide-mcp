@@ -90,7 +90,7 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
         if not self.allowed():
             return
         req = urlsplit(self.path)
-        if req.path not in ("/api/goals", "/api/reviews"):
+        if req.path not in ("/api/goals", "/api/reviews", "/api/agent-confirm"):
             return self.reply(404, {"error": "Not found"})
         expected_origin = (f"http://127.0.0.1:{self.server.server_port}",
                            f"http://localhost:{self.server.server_port}")
@@ -114,6 +114,12 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
                 if set(body) - allowed:
                     raise ValidationError("Unknown goal fields")
                 result = self.server.store.upsert_goal(**body)
+            elif req.path == "/api/agent-confirm":
+                allowed = {"draft_id", "expected_hash", "domain_scores", "user_confirmed",
+                           "personal_growth", "self_realization", "user_notes", "revision_of"}
+                if set(body) - allowed:
+                    raise ValidationError("Unknown agent confirmation fields")
+                result = self.server.store.confirm_agent_review(**body)
             else:
                 allowed = {"period_start", "period_end", "domain_scores", "user_confirmed",
                            "change_band", "evidence_refs", "personal_growth",
