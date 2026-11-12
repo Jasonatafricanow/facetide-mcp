@@ -136,7 +136,7 @@ function renderContext(ctx){
  const active=ctx.evidence.filter(e=>e.resolution_status==='active').length;
  $('evidenceCount').textContent=`${active} 条可引用证据`;
  $('evidenceList').innerHTML=ctx.evidence.length?ctx.evidence.map((e,i)=>
-  `<label class="evidence"><input type="checkbox" data-evidence="${i}" ${e.resolution_status==='active'?'':'disabled'}><div><strong>${escapeHtml(e.summary||'[无可用摘要]')}</strong><small>${escapeHtml(e.source_type)} · ${escapeHtml(e.evidence_kind)} · 发生：${escapeHtml(e.occurred_at)} · 获知：${escapeHtml(e.known_at||'未知')}</small><small>关联：${e.domain_ids.map(dname).join('、')||'待归类'} · ${escapeHtml(e.resolution_status)} · ${escapeHtml(e.source_ref)}</small></div></label>`).join(''):
+  `<label class="evidence"><input type="checkbox" data-evidence="${i}" ${e.resolution_status==='active'?'':'disabled'}><div><strong>${escapeHtml(e.summary||'[无可用摘要]')}</strong><small>${escapeHtml(e.source_type)} · ${escapeHtml(e.evidence_kind)} · 发生：${escapeHtml(e.occurred_at)} · 获知：${escapeHtml(e.known_at||'未知')}</small><small>关联：${escapeHtml(e.domain_ids.map(dname).join('、')||'待归类')} · ${escapeHtml(e.resolution_status)} · ${escapeHtml(e.source_ref)}</small></div></label>`).join(''):
   '<div class="empty">本期没有可用证据。缺失不是退步；可以手动复盘。</div>';
  $('warnings').textContent=(ctx.warnings||[]).slice(0,6).join('\n');
  const stateData=ctx.state_report||{},report=stateData.validation?.valid?stateData.report:null;
@@ -145,8 +145,8 @@ function renderContext(ctx){
    const coverage={observed:'有直接观察',partial:'证据不完整',unobserved:'证据不足'};
    $('stateReport').innerHTML='<div class="state-title">阶段状态草稿 <small>Agent 解释 · 尚待本人确认</small></div>'+
    '<div class="state-domains">'+report.domains.map(d=>{
-     const cross=(d.tradeoffs||[]).map(x=>`<p class="state-cross">跨领域关联 · ${dname(x.other_domain)}：${escapeHtml(x.claim)}</p>`).join('');
-     return `<div class="state-item"><div class="state-item-head"><b>${dname(d.domain_id)}</b><span>${escapeHtml(directions[d.direction]||d.direction)} · ${escapeHtml(coverage[d.coverage]||d.coverage)}</span></div><p>${escapeHtml(d.picture||'目前无法根据现有证据说明状态')}</p>${cross}${d.question?`<small class="state-question">待核实：${escapeHtml(d.question)}</small>`:''}</div>`;
+     const cross=(d.tradeoffs||[]).map(x=>`<p class="state-cross">跨领域关联 · ${escapeHtml(dname(x.other_domain))}：${escapeHtml(x.claim)}</p>`).join('');
+     return `<div class="state-item"><div class="state-item-head"><b>${escapeHtml(dname(d.domain_id))}</b><span>${escapeHtml(directions[d.direction]||d.direction)} · ${escapeHtml(coverage[d.coverage]||d.coverage)}</span></div><p>${escapeHtml(d.picture||'目前无法根据现有证据说明状态')}</p>${cross}${d.question?`<small class="state-question">待核实：${escapeHtml(d.question)}</small>`:''}</div>`;
    }).join('')+'</div>';
  }else if(stateData.report && !stateData.validation?.valid){
    $('stateReport').innerHTML='<div class="empty">阶段状态草稿的来源已变化或撤销，旧结论失效。需要重新编译，不能直接沿用。</div>';
@@ -158,7 +158,7 @@ function renderContext(ctx){
  $('compiledDomains').innerHTML=(ctx.domain_cards||[]).map(card=>{
    const list=(card.evidence||[]).slice(0,5).map(e=>
      `<li><span>${escapeHtml(e.summary)}</span><small>${escapeHtml(e.source_type)} / ${escapeHtml(e.source_ref)} · ${escapeHtml(e.classification)} · ${escapeHtml(e.confidence||'来源标注')}</small></li>`).join('');
-   return `<div class="compiled-card"><div class="compiled-card-top"><b>${dname(card.domain_id)}</b><small>${card.total_evidence||0} 条证据 · ${escapeHtml(card.status)}</small></div>${list?`<ul>${list}</ul>`:'<p class="soft">本期没有足够相关证据，不等于生活退步。</p>'}</div>`;
+   return `<div class="compiled-card"><div class="compiled-card-top"><b>${escapeHtml(dname(card.domain_id))}</b><small>${escapeHtml(card.total_evidence||0)} 条证据 · ${escapeHtml(card.status)}</small></div>${list?`<ul>${list}</ul>`:'<p class="soft">本期没有足够相关证据，不等于生活退步。</p>'}</div>`;
  }).join('');
  $('compilationWarnings').textContent=(stats.pending||0)?
    `尚有 ${stats.pending} 条来源记录等待 Agent 分类。可在连接的 Agent 中运行 facetide_reflection_guide；刷新本期后查看。`:
@@ -263,7 +263,7 @@ function renderGoals(){
  const goals=state.snapshot.goals,states={building:'建设',maintaining:'维持',reflecting:'反思',simplifying:'精简'};
  $('goalCount').textContent=goals.length+' 个目标';
  $('goalList').innerHTML=goals.length?goals.map(g=>
-  `<article class="panel goal-card"><div class="state">${states[g.status]||g.status} · V${g.version}</div><h3>${escapeHtml(g.title)}</h3><p><b>怎样算够了：</b>${escapeHtml(g.enough_condition)}</p><div class="tags">${g.domain_ids.map(d=>`<span>${dname(d)}</span>`).join('')}</div>
+  `<article class="panel goal-card"><div class="state">${escapeHtml(states[g.status]||g.status)} · V${escapeHtml(g.version)}</div><h3>${escapeHtml(g.title)}</h3><p><b>怎样算够了：</b>${escapeHtml(g.enough_condition)}</p><div class="tags">${g.domain_ids.map(d=>`<span>${escapeHtml(dname(d))}</span>`).join('')}</div>
   <div class="indicator-summary">${[['outcome','结果'],['driver','驱动'],['guardrail','护栏']].map(([kind,label])=>
    (g.indicators?.[kind]||[]).length?`<div><b>${label}：</b>${escapeHtml(g.indicators[kind].join('；'))}</div>`:'').join('')}</div><div class="card-foot"><small class="soft">最后修改：${escapeHtml(g.updated_at.slice(0,10))}</small><button data-edit="${escapeHtml(g.goal_id)}">修改目标 / 状态</button></div></article>`).join(''):
   '<div class="empty">暂时没有目标，不必强行为每个领域安排任务。</div>';

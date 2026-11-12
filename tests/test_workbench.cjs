@@ -6,7 +6,7 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../src/face
 
 function harness() {
   const fields = Object.fromEntries(['startDate', 'endDate', 'reviewConfirm', 'saveReview',
-    'revisionNotice', 'stateReport', 'toast'].map(id => [id, {
+    'revisionNotice', 'stateReport', 'toast', 'goalCount', 'goalList'].map(id => [id, {
       value: '', checked: true, disabled: false, style: {},
       classList: {add() {}, remove() {}},
     }]));
@@ -46,4 +46,16 @@ test('late context responses cannot restore a changed period', async () => {
   }`, context);
   assert.equal(await vm.runInContext('loadContext()', context), null);
   assert.equal(vm.runInContext('state.context', context), null);
+});
+
+
+test('persisted goal values are text, including unknown domain and status', () => {
+  const {context, fields} = harness();
+  const attack = '<img src=x onerror=alert(1)>';
+  context.attack = attack;
+  vm.runInContext(`state.snapshot={goals:[{status:attack,version:attack,
+    title:attack,enough_condition:attack,domain_ids:[attack],indicators:{},
+    updated_at:'2026-11-12',goal_id:attack}]};renderGoals()`, context);
+  assert.ok(!fields.goalList.innerHTML.includes(attack));
+  assert.equal((fields.goalList.innerHTML.match(/&lt;img/g)||[]).length, 6);
 });
