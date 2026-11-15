@@ -68,7 +68,7 @@ The normative workflow is [Agent Handoff v1](docs/agent-handoff-v1.md).
 - `facetide_draft`: stages exactly seven domain observations and two unscored
   axes with provider-scoped sources and explicit value-judgment attribution.
 - `facetide_confirm`: links the explicitly approved draft to an immutable
-  review containing the user's own optional 1–5 ratings.
+  review containing the user's own optional 0–10 ratings (half points allowed).
 
 Existing `facetide_compile_batch` and `facetide_compile_state_report`
 are retained for backward compatibility, **not the recommended Agent workflow**.
@@ -98,7 +98,7 @@ A host Agent can query these other MCP providers and forward **only a compact ob
 
 ## MVP status
 
-- Seven life domains with optional **user-owned 1–5 ratings**.
+- Seven life domains with optional **user-owned 0–10 ratings** (half points allowed).
 - Two unscored narrative axes: **personal growth** and **self-realization**.
 - Goals with **building / maintaining / reflecting / simplifying** states, "enough" conditions, and optional outcome / driver / guardrail indicators.
 - A goal can support multiple life domains.

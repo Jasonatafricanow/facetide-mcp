@@ -32,7 +32,7 @@ Seven domains: career, finance, health, family, social, leisure, environment.
 
 The two narrative axes, personal growth and self-realization, are free-text reflection fields: **not** scored and **not** mutually exclusive with domains.
 
-Satisfaction uses 1–5 integer scores, supplied only by a user. Absence is NULL/omitted, never zero and never an inferred decline. Facetide does not create a composite index.
+Satisfaction uses 0–10 scores in half-point steps, supplied only by a user. Absence is NULL/omitted, never zero and never an inferred decline. Facetide does not create a composite index.
 
 ## Goal lifecycle
 

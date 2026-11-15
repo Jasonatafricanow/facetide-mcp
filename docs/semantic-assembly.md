@@ -7,7 +7,7 @@ The original workbench had seven blank rating forms and two blank narrative fiel
 Do not confuse the two kinds of state:
 
 - **Evidence projection (machine-compiled):** Life domain associations, extracted observation, possible changes, cross-event growth/self-realization inferences, uncertainty, source references.
-- **User judgment (user-confirmed):** 1–5 satisfaction, whether a goal is enough, the final narrative reflection.
+- **User judgment (user-confirmed):** 0–10 satisfaction, whether a goal is enough, the final narrative reflection.
 
 The first is automatically assembled *when an MCP-enabled host Agent invokes the compilation workflow*. The second remains owned by the user. The standalone Web UI has no autonomous LLM and cannot compile unclassified memories by itself.
 

@@ -65,7 +65,7 @@ class MCPProtocolTest(unittest.TestCase):
                     draft = tool_payload(staged)
                     confirmed = await session.call_tool("facetide_confirm", {
                         "draft_id": draft["draft_id"], "expected_hash": draft["draft_hash"],
-                        "domain_scores": {"career": 3}, "user_confirmed": True,
+                        "domain_scores": {"career": 5.5, "health": 9}, "user_confirmed": True,
                     })
                     self.assertFalse(confirmed.isError)
                     newer = await session.call_tool("facetide_draft", payload())
@@ -78,6 +78,8 @@ class MCPProtocolTest(unittest.TestCase):
                     context = tool_payload(resumed)
                     self.assertEqual(context["confirmed_review"]["approved_draft"]["draft_id"],
                                      draft["draft_id"])
+                    self.assertEqual(context["confirmed_review"]["domain_scores"],
+                                     {"career": 5.5, "health": 9})
                     self.assertEqual(context["latest_draft"]["draft_id"],
                                      tool_payload(newer)["draft_id"])
                     self.assertEqual(context["history"]["reviews"][0]["approved_draft"]

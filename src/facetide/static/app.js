@@ -28,22 +28,24 @@ function nav(page){
  $('breadcrumb').textContent=({overview:'OVERVIEW / 生活总览',review:'REVIEW / 周期复盘',goals:'GOALS / 目标与够了',history:'HISTORY / 历史轨迹'})[page];
  window.scrollTo(0,0);
 }
+const isScore=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=10;
+const SCORE_OPTIONS=Array.from({length:21},(_,i)=>i/2);
 function polar(cx,cy,r,a){return [cx+Math.cos(a)*r,cy+Math.sin(a)*r]}
 function wheelSvg(scores){
  const cx=230,cy=210,r=145,step=Math.PI*2/7;
  let grid='',fills='',labels='';
  [1,2,3,4,5].forEach(n=>{grid+=`<circle cx="${cx}" cy="${cy}" r="${r*n/5}" fill="none" stroke="#e7eee8" stroke-width="1"/>`});
- const count=Object.keys(scores).filter(d=>Number.isInteger(scores[d])).length;
+ const count=Object.keys(scores).filter(d=>isScore(scores[d])).length;
  domainMeta.forEach((d,i)=>{
   const a=-Math.PI/2+i*step,b=a+step,mid=(a+b)/2,p1=polar(cx,cy,r,a),p2=polar(cx,cy,r,b);
   grid+=`<path d="M${cx} ${cy} L${p1[0]} ${p1[1]} A${r} ${r} 0 0 1 ${p2[0]} ${p2[1]} Z" fill="transparent" stroke="#e7eee8" stroke-width=".8"/>`;
   const score=scores[d[0]];
-  if(Number.isInteger(score)){
-   const rr=r*score/5,q1=polar(cx,cy,rr,a+.03),q2=polar(cx,cy,rr,b-.03),p=polar(cx,cy,rr,mid);
-   fills+=`<path d="M${cx} ${cy} L${q1[0]} ${q1[1]} A${rr} ${rr} 0 0 1 ${q2[0]} ${q2[1]} Z" fill="#70a68d" fill-opacity="${(.11+score*.075).toFixed(2)}" stroke="#4d8d70" stroke-width="1.1"/><circle cx="${p[0]}" cy="${p[1]}" r="3.2" fill="#377f61"/>`;
+  if(isScore(score)){
+   const rr=r*score/10,q1=polar(cx,cy,rr,a+.03),q2=polar(cx,cy,rr,b-.03),p=polar(cx,cy,rr,mid);
+   fills+=`<path d="M${cx} ${cy} L${q1[0]} ${q1[1]} A${rr} ${rr} 0 0 1 ${q2[0]} ${q2[1]} Z" fill="#70a68d" fill-opacity="${(.11+score*.0375).toFixed(2)}" stroke="#4d8d70" stroke-width="1.1"/><circle cx="${p[0]}" cy="${p[1]}" r="3.2" fill="#377f61"/>`;
   }
   const label=polar(cx,cy,r+36,mid);
-  labels+=`<text x="${label[0]}" y="${label[1]}" text-anchor="middle" dominant-baseline="central" font-size="11" fill="${Number.isInteger(score)?'#496c5a':'#95a59b'}" font-weight="600">${escapeHtml(d[1])}</text>`;
+  labels+=`<text x="${label[0]}" y="${label[1]}" text-anchor="middle" dominant-baseline="central" font-size="11" fill="${isScore(score)?'#496c5a':'#95a59b'}" font-weight="600">${escapeHtml(d[1])}</text>`;
  });
  return `<svg viewBox="0 0 460 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="七个生活领域的本人评分"><circle cx="${cx}" cy="${cy}" r="${r+5}" fill="#fcfefc" stroke="#e5ebe6"/>${grid}${fills}${labels}<circle cx="${cx}" cy="${cy}" r="35" fill="#fff" stroke="#dfeae2"/><text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="21" fill="#377b61" font-weight="700">${count}<tspan font-size="12" fill="#9db4a3"> / 7</tspan></text><text x="${cx}" y="${cy+15}" text-anchor="middle" font-size="10" fill="#8ea597">已评价</text></svg>`;
 }
@@ -76,14 +78,14 @@ function renderOverview(){
   const proposed=state.context?.state_report?.validation?.valid?
     state.context.state_report.report?.domains?.find(d=>d.domain_id===id):null;
   const evidence=card?.evidence?.[0];
-  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${Number.isInteger(score)?score:'—'} <small>/ 5</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><p class="observed-mini">${handoffDomain?.observation?escapeHtml(handoffDomain.observation):proposed?.picture?escapeHtml(proposed.picture):evidence?escapeHtml(evidence.summary):'本期暂无相关证据'} <small>${handoffDomain?'Agent 标准草稿 · 未确认':proposed?'Agent 状态草稿 · 未确认':evidence?'来源：'+escapeHtml(evidence.source_type)+' · 未确认':'未知不等于退步'}</small></p><div class="bar"><span style="width:${Number.isInteger(score)?score*20:0}%"></span></div></article>`;
+  return `<article class="panel domain"><div class="domain-head"><div class="domain-icon">${icon}</div><div class="domain-score">${isScore(score)?score:'—'} <small>/ 10</small></div></div><h3>${name}</h3><p>${desc} · ${goals} 项目标</p><p class="observed-mini">${handoffDomain?.observation?escapeHtml(handoffDomain.observation):proposed?.picture?escapeHtml(proposed.picture):evidence?escapeHtml(evidence.summary):'本期暂无相关证据'} <small>${handoffDomain?'Agent 标准草稿 · 未确认':proposed?'Agent 状态草稿 · 未确认':evidence?'来源：'+escapeHtml(evidence.source_type)+' · 未确认':'未知不等于退步'}</small></p><div class="bar"><span style="width:${isScore(score)?score*10:0}%"></span></div></article>`;
  }).join('');
 }
 function renderRatingRows(previous={}){
- $('ratingRows').innerHTML=domainMeta.map(([id,name])=>`<div class="rating-row" data-domain="${id}"><div><b>${name}</b><small>上次：${Number.isInteger(previous[id])?previous[id]+' 分':'尚无评分'}</small></div><div class="ratings" role="group" aria-label="${name}满意度">${[1,2,3,4,5].map(x=>`<button type="button" data-value="${x}" aria-pressed="false">${x}</button>`).join('')}<button class="clear" data-clear="yes" type="button">留空</button></div></div>`).join('');
- $('ratingRows').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
-  const key=btn.closest('[data-domain]').dataset.domain;
-  if(btn.dataset.clear)delete state.ratings[key];else state.ratings[key]=Number(btn.dataset.value);
+ $('ratingRows').innerHTML=domainMeta.map(([id,name])=>`<div class="rating-row" data-domain="${id}"><div><b>${name}</b><small>上次：${isScore(previous[id])?previous[id]+' 分':'尚无评分'}</small></div><div class="ratings"><select aria-label="${name}满意度（0—10）"><option value="">留空</option>${SCORE_OPTIONS.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></div></div>`).join('');
+ $('ratingRows').querySelectorAll('select').forEach(sel=>sel.addEventListener('change',()=>{
+  const key=sel.closest('[data-domain]').dataset.domain;
+  if(sel.value==='')delete state.ratings[key];else state.ratings[key]=Number(sel.value);
   refreshRatingState();
  }));
  refreshRatingState();
@@ -91,7 +93,7 @@ function renderRatingRows(previous={}){
 function refreshRatingState(){
  document.querySelectorAll('.rating-row').forEach(row=>{
   const v=state.ratings[row.dataset.domain];
-  row.querySelectorAll('[data-value]').forEach(btn=>{const on=Number(btn.dataset.value)===v;btn.classList.toggle('selected',on);btn.setAttribute('aria-pressed',String(on))});
+  const sel=row.querySelector('select');if(sel)sel.value=isScore(v)?String(v):'';
  });
 }
 
@@ -131,7 +133,7 @@ function renderContext(ctx){
  state.context=ctx;
  const previous=ctx.previous_review;
  $('previousSnapshot').innerHTML=previous?`<strong>${escapeHtml(previous.period_start)} → ${escapeHtml(previous.period_end)}</strong>`+
- domainMeta.map(([id,name])=>`<div>${name}：<b>${Number.isInteger(previous.domain_scores[id])?previous.domain_scores[id]+'/5':'未评'}</b></div>`).join(''):'<p>没有更早的快照。可以直接进行第一次复盘。</p>';
+ domainMeta.map(([id,name])=>`<div>${name}：<b>${isScore(previous.domain_scores[id])?previous.domain_scores[id]+'/10':'未评'}</b></div>`).join(''):'<p>没有更早的快照。可以直接进行第一次复盘。</p>';
  renderRatingRows(previous?.domain_scores||{});
  const active=ctx.evidence.filter(e=>e.resolution_status==='active').length;
  $('evidenceCount').textContent=`${active} 条可引用证据`;
@@ -295,11 +297,11 @@ function renderTrend(){
  const W=760,H=230,margin={left:48,right:25,top:20,bottom:43};
  const plot=W-margin.left-margin.right,plotHeight=H-margin.top-margin.bottom;
  const x=i=>margin.left+plot*(points.length===1?.5:i/(points.length-1));
- const y=v=>margin.top+(5-v)*plotHeight/4;
- const grid=[1,2,3,4,5].map(v=>`<line x1="${margin.left}" y1="${y(v)}" x2="${W-margin.right}" y2="${y(v)}" stroke="#e5eee8"/><text x="${margin.left-18}" y="${y(v)+4}" text-anchor="middle" font-size="12" fill="#8da596">${v}</text>`).join('');
+ const y=v=>margin.top+(10-v)*plotHeight/10;
+ const grid=[0,2,4,6,8,10].map(v=>`<line x1="${margin.left}" y1="${y(v)}" x2="${W-margin.right}" y2="${y(v)}" stroke="#e5eee8"/><text x="${margin.left-18}" y="${y(v)+4}" text-anchor="middle" font-size="12" fill="#8da596">${v}</text>`).join('');
  const bars=points.map((p,i)=>{
-  const value=p.domain_scores[id],px=x(i),label=p.period_end.slice(5),base=y(1);
-  const dot=Number.isInteger(value)?`<line x1="${px}" y1="${base}" x2="${px}" y2="${y(value)}" stroke="#8fbea3" stroke-width="7" stroke-linecap="round" opacity=".8"/><circle cx="${px}" cy="${y(value)}" r="5" fill="#397d62"/><text x="${px}" y="${y(value)-13}" text-anchor="middle" font-size="12" font-weight="700" fill="#386b58">${value}</text>`: `<circle cx="${px}" cy="${base}" r="3" fill="#d1dbd3"/>`;
+  const value=p.domain_scores[id],px=x(i),label=p.period_end.slice(5),base=y(0);
+  const dot=isScore(value)?`<line x1="${px}" y1="${base}" x2="${px}" y2="${y(value)}" stroke="#8fbea3" stroke-width="7" stroke-linecap="round" opacity=".8"/><circle cx="${px}" cy="${y(value)}" r="5" fill="#397d62"/><text x="${px}" y="${y(value)-13}" text-anchor="middle" font-size="12" font-weight="700" fill="#386b58">${value}</text>`: `<circle cx="${px}" cy="${base}" r="3" fill="#d1dbd3"/>`;
   return dot+`<text x="${px}" y="${H-15}" text-anchor="middle" font-size="10.5" fill="#82958b">${escapeHtml(label)}</text>`;
  }).join('');
  $('trendChart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${escapeHtml(dname(id))}的阶段评分图">${grid}${bars}</svg>`;
@@ -308,7 +310,7 @@ function renderHistory(){
  renderTrend();
  $('historyList').innerHTML=state.history.length?state.history.map(r=>
  `<article class="panel history-card"><div class="eyebrow">${escapeHtml(r.period_start)} — ${escapeHtml(r.period_end)}</div><h3>阶段快照 ${r.revision_of?'· 修订版':''}</h3>
- <div class="tags">${domainMeta.filter(d=>Number.isInteger(r.domain_scores[d[0]])).map(d=>`<span>${d[1]} ${r.domain_scores[d[0]]}/5</span>`).join('')||'<span>叙事复盘</span>'}</div>
+ <div class="tags">${domainMeta.filter(d=>isScore(r.domain_scores[d[0]])).map(d=>`<span>${d[1]} ${r.domain_scores[d[0]]}/10</span>`).join('')||'<span>叙事复盘</span>'}</div>
  ${r.personal_growth?`<blockquote>成长：${escapeHtml(r.personal_growth)}</blockquote>`:''}
  ${r.self_realization?`<blockquote>实现：${escapeHtml(r.self_realization)}</blockquote>`:''}
  ${r.user_notes?`<blockquote>${escapeHtml(r.user_notes)}</blockquote>`:''}

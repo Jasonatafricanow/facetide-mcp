@@ -64,6 +64,23 @@ class LifeStoreTests(unittest.TestCase):
         saved = self.goal(indicators={"outcome": ["rested most mornings"], "guardrail": ["work must remain sustainable"]})
         self.assertEqual(saved["indicators"]["outcome"], ["rested most mornings"])
 
+    def test_scores_use_ten_point_scale_with_half_points(self):
+        scores = {"career": 7.5, "finance": 5, "health": 2.5, "family": 9,
+                  "social": 4, "leisure": 8.5, "environment": 1}
+        review = self.store.save_review(period_start="2026-11-14", period_end="2026-11-14",
+                                        domain_scores=scores, user_confirmed=True)
+        self.assertEqual(review["domain_scores"], scores)
+        edge = self.store.save_review(period_start="2026-11-15", period_end="2026-11-15",
+                                      domain_scores={"health": 0, "career": 10, "family": 7.0},
+                                      user_confirmed=True)
+        self.assertEqual(edge["domain_scores"], {"health": 0, "career": 10, "family": 7})
+        for bad in (10.5, -0.5, 6.3, True, "6", float("nan"), float("inf"), None):
+            with self.assertRaises(ValidationError, msg=repr(bad)):
+                self.store.save_review(period_start="2026-11-16", period_end="2026-11-16",
+                                       domain_scores={"health": bad}, user_confirmed=True)
+        self.assertEqual(self.store.get_history()["total"], 2)
+        self.assertEqual(self.store.get_snapshot()["score_scale"], {"min": 0, "max": 10, "step": 0.5})
+
     def test_review_is_user_rated_and_immutable(self):
         goal = self.goal()
         with self.assertRaises(ValidationError):
@@ -82,7 +99,7 @@ class LifeStoreTests(unittest.TestCase):
         self.assertEqual(len(self.store.get_history(domain_id="finance")["reviews"]), 0)
 
     def test_score_validation_and_partial_scores(self):
-        for bad in (True, 0, 6, 3.5, "4"):
+        for bad in (True, -1, 11, 3.25, "4"):
             with self.subTest(bad=bad), self.assertRaises(ValidationError):
                 self.store.save_review(period_start="2026-10-01", period_end="2026-10-31",
                                        domain_scores={"health": bad}, user_confirmed=True)

@@ -25,6 +25,16 @@ DOMAINS = {
 DOMAIN_IDS = frozenset(DOMAINS)
 GOAL_STATES = frozenset({"building", "maintaining", "reflecting", "simplifying"})
 CHANGE_TYPES = frozenset({"new", "stable", "receding"})
+# User-owned satisfaction: 0..10 in half-point steps; missing stays omitted, never 0.
+SCORE_SCALE = {"min": 0, "max": 10, "step": 0.5}
+
+
+def _score(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValidationError("domain_scores values must be numbers 0..10 in 0.5 steps")
+    if not 0 <= value <= 10 or value * 2 != int(value * 2):
+        raise ValidationError("domain_scores values must be numbers 0..10 in 0.5 steps")
+    return int(value) if value == int(value) else float(value)
 
 
 class ValidationError(ValueError):
@@ -272,7 +282,7 @@ class LifeStore:
             "domains": [{"domain_id": d, "name": name, "score": scores.get(d)}
                         for d, name in DOMAINS.items()],
             "goals": goals, "latest_review": latest,
-            "score_ownership": "user_only",
+            "score_ownership": "user_only", "score_scale": SCORE_SCALE,
         }
 
     def upsert_goal(self, *, title: str, enough_condition: str,
@@ -453,7 +463,7 @@ class LifeStore:
                 (period_start, period_end)).fetchone(), db)
 
     def confirm_agent_review(self, *, draft_id: str, expected_hash: str,
-                             domain_scores: dict[str,int], user_confirmed: bool,
+                             domain_scores: dict[str, float], user_confirmed: bool,
                              user_notes: str = "", personal_growth: str | None = None,
                              self_realization: str | None = None,
                              revision_of: str | None = None) -> dict:
@@ -503,7 +513,7 @@ class LifeStore:
         }
 
     def save_review(self, *, period_start: str, period_end: str,
-                    domain_scores: dict[str, int],
+                    domain_scores: dict[str, float],
                     user_confirmed: bool = False,
                     change_band: dict[str, list[str]] | None = None,
                     evidence_refs: list[dict[str, str]] | None = None,
@@ -513,11 +523,9 @@ class LifeStore:
         if user_confirmed is not True:
             raise ValidationError("Review scores and interpretation require user confirmation")
         _period(period_start, period_end)
-        if not isinstance(domain_scores, dict) or any(
-            d not in DOMAIN_IDS or type(score) is not int or not 1 <= score <= 5
-            for d, score in domain_scores.items()
-        ):
-            raise ValidationError("domain_scores must be a subset of seven domains, integers 1..5")
+        if not isinstance(domain_scores, dict) or any(d not in DOMAIN_IDS for d in domain_scores):
+            raise ValidationError("domain_scores must be a subset of the seven domains")
+        domain_scores = {d: _score(score) for d, score in domain_scores.items()}
         personal_growth = _review_text(personal_growth, "personal_growth")
         self_realization = _review_text(self_realization, "self_realization")
         user_notes = _review_text(user_notes, "user_notes")

@@ -53,7 +53,7 @@ def facetide_draft(
 
     The HOST LLM interprets dialog and upstream StateBar/MR-MEM/other tool
     results. Facetide validates structure, referenced source IDs, timestamps
-    and user-value attribution; does NOT infer meaning or 1–5 scores.
+    and user-value attribution; does NOT infer meaning or 0–10 scores.
     For each domain, distinguish observation from meaning.assessment/basis/why,
     and mark any value hypothesis as agent_hypothesis, never user-endorsed.
     Read facetide_context for the full machine-readable contract first.
@@ -66,7 +66,7 @@ def facetide_draft(
 
 @mcp.tool()
 def facetide_confirm(
-    draft_id: str, expected_hash: str, domain_scores: dict[str, int],
+    draft_id: str, expected_hash: str, domain_scores: dict[str, float],
     user_confirmed: bool, user_notes: str = "",
     personal_growth: str | None = None,
     self_realization: str | None = None,
@@ -203,7 +203,7 @@ def facetide_get_agent_review(period_start: str, period_end: str) -> dict:
 @_legacy_tool
 def facetide_confirm_agent_review(
     draft_id: str, expected_hash: str,
-    domain_scores: dict[str, int], user_confirmed: bool,
+    domain_scores: dict[str, float], user_confirmed: bool,
     user_notes: str = "", personal_growth: str | None = None,
     self_realization: str | None = None, revision_of: str | None = None,
 ) -> dict:
@@ -289,13 +289,13 @@ def facetide_upsert_goal(
 
 @_legacy_tool
 def facetide_save_review(
-    period_start: str, period_end: str, domain_scores: dict[str, int],
+    period_start: str, period_end: str, domain_scores: dict[str, float],
     user_confirmed: bool, change_band: dict[str, list[str]] | None = None,
     evidence_refs: list[dict[str, str]] | None = None,
     personal_growth: str = "", self_realization: str = "",
     user_notes: str = "", revision_of: str | None = None,
 ) -> dict:
-    """Freeze a user-confirmed review. Ratings are the user's own (1..5).
+    """Freeze a user-confirmed review. Ratings are the user's own (0..10, half points allowed).
 
     Any domain can be omitted. Evidence refs must resolve to active source
     records in the review period. Historical reviews are append-only; pass

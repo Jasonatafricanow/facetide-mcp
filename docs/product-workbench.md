@@ -30,7 +30,7 @@ This workflow requires `FACETIDE_TOOL_PROFILE=legacy`; it is not required for st
 ## Four product views
 
 ### Overview
-- Seven separate subjective 1–5 ratings on a wheel display; missing ratings remain empty, not zero.
+- Seven separate subjective 0–10 ratings on a wheel display; missing ratings remain empty, not zero.
 - Two unscored axes, personal growth and self-realization.
 - Goal counts per domain, newest user-confirmed snapshot.
 

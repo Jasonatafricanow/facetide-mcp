@@ -11,7 +11,7 @@ baseline, goal strain, cross-domain costs, or consequential uncertainty.
 - **Proposed observation**: source-cited current condition, possible trajectory,
   tradeoff, and two narrative axes. May be revised or withdrawn after source
   changes; the Agent is responsible for structured interpretation.
-- **User-confirmed judgment**: personal 1–5 satisfaction, goal changes and final
+- **User-confirmed judgment**: personal 0–10 satisfaction, goal changes and final
   meaning of the period. No model-generated metrics or automatic goal escalation.
 
 ## Pipeline

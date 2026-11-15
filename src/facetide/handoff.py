@@ -12,7 +12,7 @@ import hashlib
 import json
 import uuid
 
-from .core import DOMAINS, ValidationError, _period, _utc_now
+from .core import DOMAINS, SCORE_SCALE, ValidationError, _period, _utc_now
 from .contract import HANDOFF_SCHEMA
 
 AXES = ("personal_growth", "self_realization")
@@ -208,7 +208,7 @@ class AgentHandoff:
             "protocol": "facetide.agent_handoff.v1",
             "period_start": period_start, "period_end": period_end,
             "previous_user_review": latest, "user_goals": goals,
-            "domains": list(DOMAINS), "axes": list(AXES),
+            "domains": list(DOMAINS), "axes": list(AXES), "score_scale": SCORE_SCALE,
             "schema": HANDOFF_SCHEMA,
             "source_tools": {
                 "statebar": ["user_state.snapshot", "user_state.get_state",
@@ -222,7 +222,7 @@ class AgentHandoff:
                 "Return exactly seven domain observations (unknown allowed) and two qualitative axes.",
                 "Distinguish observation from why the state is worthwhile/costly TO THIS USER.",
                 "Attribute value explanations to explicit user expression, confirmed history, or an Agent hypothesis.",
-                "Never infer subjective 1-5 satisfaction scores. Ask for those only at confirmation.",
+                "Never infer subjective 0-10 satisfaction scores. Ask for those only at confirmation.",
                 "StateBar snapshot is bounded and current-only, not a complete historical timeline.",
                 "Submit one draft with facetide_draft, then review it with the user.",
                 "Freeze only the user's explicitly approved interpretation and ratings.",

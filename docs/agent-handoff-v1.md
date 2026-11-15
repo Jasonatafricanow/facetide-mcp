@@ -33,7 +33,7 @@ and distinguish what the user said from the Agent's hypothesis.
    exactly seven domain records and two narrative axes using
    `facetide_draft`. The output is a *draft*, not user truth.
 5. Show the proposed observation and its attribution to the user. Ask only
-   about material uncertainty. Solicit 1–5 satisfaction ratings for whichever
+   about material uncertainty. Solicit 0–10 satisfaction ratings for whichever
    domains the user wants to rate; allow omissions.
 6. Call `facetide_confirm` only after the user approves the
    exact draft, any narrative edits and the ratings. Preserve the immutable
@@ -118,7 +118,7 @@ axis receives a numerical score.
 ratings. It returns an immutable draft_id and draft_hash.
 
 `facetide_confirm` requires the draft ID/hash and explicit
-user confirmation, accepts their own optional 1–5 scores and narrative
+user confirmation, accepts their own optional 0–10 scores and narrative
 corrections, writes a confirmed review, and links the approved draft.
 Changing an Agent's interpretation produces a new draft, not a silent
 overwrite of the old one.
