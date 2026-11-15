@@ -10,7 +10,7 @@ import os
 
 from mcp.server.fastmcp import FastMCP
 
-from .core import LifeStore, ValidationError
+from .core import LifeStore
 
 mcp = FastMCP("Facetide")
 
@@ -41,15 +41,7 @@ def facetide_context(period_start: str, period_end: str, history_limit: int = 0)
     The host LLM then calls StateBar, MR-MEM and specialist MCPs ITSELF.
     Facetide does not run a classifier or retrieve those providers here.
     """
-    if type(history_limit) is not int or not 0 <= history_limit <= 20:
-        raise ValidationError("history_limit must be an integer 0..20")
-    store = LifeStore()
-    result = store.agent_brief(period_start, period_end)
-    result["latest_draft"] = store.get_agent_review(period_start, period_end)["draft"]
-    result["confirmed_review"] = store.get_period_review(period_start, period_end)
-    if history_limit:
-        result["history"] = store.get_history(limit=history_limit)
-    return result
+    return LifeStore().agent_context(period_start, period_end, history_limit)
 
 
 @mcp.tool()

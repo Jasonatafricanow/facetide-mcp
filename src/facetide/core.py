@@ -417,6 +417,17 @@ class LifeStore:
         from .state import StateSynthesis
         return StateSynthesis(self).get_latest(period_start, period_end)
 
+    def agent_context(self, period_start: str, period_end: str, history_limit: int = 0) -> dict:
+        """Compact Agent context shared by MCP facetide_context and HTTP /api/agent-context."""
+        if type(history_limit) is not int or not 0 <= history_limit <= 20:
+            raise ValidationError("history_limit must be an integer 0..20")
+        result = self.agent_brief(period_start, period_end)
+        result["latest_draft"] = self.get_agent_review(period_start, period_end)["draft"]
+        result["confirmed_review"] = self.get_period_review(period_start, period_end)
+        if history_limit:
+            result["history"] = self.get_history(limit=history_limit)
+        return result
+
     def agent_brief(self, period_start: str, period_end: str) -> dict:
         """Give the host LLM a structured task contract, not an AI service."""
         from .handoff import AgentHandoff

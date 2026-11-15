@@ -73,6 +73,11 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
                 q = parse_qs(req.query)
                 return self.reply(200, self.server.store.prepare_review(
                     q.get("start", [""])[0], q.get("end", [""])[0]))
+            if req.path == "/api/agent-context":
+                q = parse_qs(req.query)
+                return self.reply(200, self.server.store.agent_context(
+                    q.get("start", [""])[0], q.get("end", [""])[0],
+                    int(q.get("history_limit", ["0"])[0])))
             if req.path == "/api/state":
                 q = parse_qs(req.query)
                 return self.reply(200, self.server.store.get_state_report(
@@ -90,7 +95,7 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
         if not self.allowed():
             return
         req = urlsplit(self.path)
-        if req.path not in ("/api/goals", "/api/reviews", "/api/agent-confirm"):
+        if req.path not in ("/api/goals", "/api/reviews", "/api/agent-draft", "/api/agent-confirm"):
             return self.reply(404, {"error": "Not found"})
         expected_origin = (f"http://127.0.0.1:{self.server.server_port}",
                            f"http://localhost:{self.server.server_port}")
@@ -114,6 +119,11 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
                 if set(body) - allowed:
                     raise ValidationError("Unknown goal fields")
                 result = self.server.store.upsert_goal(**body)
+            elif req.path == "/api/agent-draft":
+                allowed = {"period_start", "period_end", "evidence", "domains", "axes", "agent_note"}
+                if set(body) - allowed:
+                    raise ValidationError("Unknown agent draft fields")
+                result = self.server.store.stage_agent_review(**body)
             elif req.path == "/api/agent-confirm":
                 allowed = {"draft_id", "expected_hash", "domain_scores", "user_confirmed",
                            "personal_growth", "self_realization", "user_notes", "revision_of"}

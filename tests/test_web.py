@@ -8,6 +8,7 @@ from pathlib import Path
 
 from facetide.core import LifeStore
 from facetide.web import WorkbenchServer
+from test_agent_handoff import payload
 
 
 class WorkbenchTests(unittest.TestCase):
@@ -139,3 +140,75 @@ class WorkbenchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AgentHandoffHttpTests(unittest.TestCase):
+    """HTTP agent-context/agent-draft must match the compact MCP contract."""
+
+    setUp, stop, request = WorkbenchTests.setUp, WorkbenchTests.stop, WorkbenchTests.request
+
+    def post(self, path, payload, token=True):
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["X-Facetide-Token"] = self.server.token
+        status, _, content = self.request("POST", path, payload, headers)
+        return status, json.loads(content)
+
+    def get(self, path):
+        status, _, content = self.request("GET", path)
+        return status, json.loads(content)
+
+    def no_review_saved(self):
+        self.assertEqual(self.server.store.get_history()["total"], 0)
+        self.assertIsNone(self.server.store.get_snapshot()["latest_review"])
+
+    def test_agent_context_matches_compact_mcp_context(self):
+        import os
+        from unittest import mock
+        from facetide import server as mcp_server
+        self.server.store.stage_agent_review(**payload())
+        status, http_result = self.get("/api/agent-context?start=2026-11-01&end=2026-11-05&history_limit=3")
+        self.assertEqual(status, 200)
+        with mock.patch.dict(os.environ, {"FACETIDE_DB_PATH": str(self.server.store.path)}):
+            mcp_result = mcp_server.facetide_context("2026-11-01", "2026-11-05", 3)
+        self.assertEqual(http_result, json.loads(json.dumps(mcp_result, ensure_ascii=False)))
+        self.assertEqual(http_result["protocol"], "facetide.agent_handoff.v1")
+        self.assertIsNotNone(http_result["latest_draft"])
+        for bad in ("history_limit=21", "history_limit=x", "history_limit=0&start=2026-11-05&end=2026-11-01"):
+            query = bad if "start=" in bad else "start=2026-11-01&end=2026-11-05&" + bad
+            self.assertEqual(self.get("/api/agent-context?" + query)[0], 400, bad)
+
+    def test_agent_draft_stages_only_and_never_becomes_a_review(self):
+        self.assertEqual(self.post("/api/agent-draft", payload(), token=False)[0], 403)
+        status, staged = self.post("/api/agent-draft", payload())
+        self.assertEqual(status, 201)
+        self.assertEqual(staged["status"], "agent_proposal")
+        self.no_review_saved()
+        _, context = self.get("/api/agent-context?start=2026-11-01&end=2026-11-05")
+        self.assertEqual(context["latest_draft"]["draft_hash"], staged["draft_hash"])
+        self.assertIsNone(context["confirmed_review"])
+
+    def test_agent_draft_rejects_review_fields_instead_of_saving_a_review(self):
+        for extra in ({"user_confirmed": True}, {"domain_scores": {"health": 3}}):
+            status, _ = self.post("/api/agent-draft", {**payload(), **extra})
+            self.assertEqual(status, 400, extra)
+        incomplete = payload()
+        incomplete["domains"] = incomplete["domains"][:6]
+        self.assertEqual(self.post("/api/agent-draft", incomplete)[0], 400)
+        missing = payload()
+        del missing["axes"]
+        self.assertEqual(self.post("/api/agent-draft", missing)[0], 400)
+        self.no_review_saved()
+        _, context = self.get("/api/agent-context?start=2026-11-01&end=2026-11-05")
+        self.assertIsNone(context["latest_draft"])
+
+    def test_confirm_requires_explicit_flag_and_current_hash(self):
+        _, staged = self.post("/api/agent-draft", payload())
+        base = {"draft_id": staged["draft_id"], "expected_hash": staged["draft_hash"],
+                "domain_scores": {"health": 3}}
+        self.assertEqual(self.post("/api/agent-confirm", {**base, "user_confirmed": False})[0], 400)
+        self.assertEqual(self.post("/api/agent-confirm", {**base, "expected_hash": "0" * 64, "user_confirmed": True})[0], 400)
+        self.no_review_saved()
+        status, confirmed = self.post("/api/agent-confirm", {**base, "user_confirmed": True})
+        self.assertEqual(status, 201)
+        self.assertEqual(confirmed["review"]["domain_scores"], {"health": 3})
