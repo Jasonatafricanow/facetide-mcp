@@ -584,6 +584,44 @@ class LifeStore:
             ))
             return self._review(db.execute("SELECT * FROM reviews WHERE id=?", (review_id,)).fetchone(), db)
 
+    def dashboard_summary(self) -> dict:
+        """Read-only life summary for an outside dashboard (WorkBench), contract facetide.summary.v1.
+
+        Only user-confirmed reviews exist in `reviews`; agent drafts and compiled evidence are never
+        read here. Returns the latest confirmed review, the latest confirmed review of the previous
+        period (a revision of the same period is not "previous"), the seven domain scores (null when
+        the user did not score a domain), the two reflection axes as the user's own text, and the
+        current goals. No evidence refs, user notes, drafts, raw conversation, nutrition or clinical data.
+        """
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT * FROM reviews ORDER BY period_end DESC, confirmed_at DESC, rowid DESC").fetchall()
+            goals = self._goals(db)
+
+        def view(row):
+            if row is None:
+                return None
+            scores = json.loads(row["scores_json"])
+            return {"review_id": row["id"], "period_start": row["period_start"], "period_end": row["period_end"],
+                    "confirmed_at": row["confirmed_at"],
+                    "domain_scores": {d: scores.get(d) for d in DOMAINS},
+                    "personal_growth": row["growth_reflection"] or None,
+                    "self_realization": row["realization_reflection"] or None}
+
+        latest = rows[0] if rows else None
+        previous = next((r for r in rows[1:] if (r["period_start"], r["period_end"])
+                         != (latest["period_start"], latest["period_end"])), None) if latest else None
+        return {
+            "contract": "facetide.summary.v1",
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "score_scale": SCORE_SCALE,
+            "domains": [{"domain_id": d, "name": name} for d, name in DOMAINS.items()],
+            "latest": view(latest), "previous": view(previous),
+            "goals": [{"goal_id": g["goal_id"], "title": g["title"], "enough_condition": g["enough_condition"],
+                       "status": g["status"], "domain_ids": g["domain_ids"], "updated_at": g["updated_at"]}
+                      for g in goals],
+        }
+
     def get_history(self, domain_id: str | None = None, limit: int = 12) -> dict:
         if domain_id is not None and domain_id not in DOMAIN_IDS:
             raise ValidationError("Unknown domain_id")
