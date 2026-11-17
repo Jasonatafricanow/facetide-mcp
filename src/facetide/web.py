@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import secrets
 import sys
 import webbrowser
@@ -25,6 +26,10 @@ class WorkbenchServer(ThreadingHTTPServer):
         super().__init__(address, WorkbenchHandler)
         self.store = store
         self.token = secrets.token_urlsafe(32)
+        # Service identity for the read-only summary (WorkBench). Configured, never the browser's session
+        # token (that one is handed out by /api/bootstrap). Unset or too short: the route is disabled.
+        summary = os.environ.get("FACETIDE_SUMMARY_TOKEN", "")
+        self.summary_token = summary if len(summary) >= 24 else None
 
 
 class WorkbenchHandler(BaseHTTPRequestHandler):
@@ -63,6 +68,8 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
             if req.path == "/api/bootstrap":
                 return self.reply(200, {"token": self.server.token, "version": __version__,
                                         "source": type(self.server.store.source).__name__})
+            if req.path == "/api/summary/v1":
+                return self.summary()
             if req.path == "/api/snapshot":
                 return self.reply(200, self.server.store.get_snapshot())
             if req.path == "/api/history":
@@ -90,6 +97,15 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
             return self.reply(400, {"error": str(exc)})
         except OSError:
             return self.reply(503, {"error": "Data source unavailable"})
+
+    def summary(self):
+        """facetide.summary.v1: read-only, bearer service token, GET only, no query parameters."""
+        if self.server.summary_token is None:
+            return self.reply(404, {"error": "Not found"})
+        auth = self.headers.get("Authorization", "")
+        if not secrets.compare_digest(auth.encode(), f"Bearer {self.server.summary_token}".encode()):
+            return self.reply(401, {"error": "Unauthorized"})
+        return self.reply(200, self.server.store.dashboard_summary())
 
     def do_POST(self):
         if not self.allowed():
