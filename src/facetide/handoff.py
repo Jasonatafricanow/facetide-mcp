@@ -12,7 +12,7 @@ import hashlib
 import json
 import uuid
 
-from .core import DOMAINS, SCORE_SCALE, ValidationError, _period, _utc_now
+from .core import DOMAINS, SCORE_SCALE, Conflict, NotFound, ValidationError, _period, _utc_now
 from .contract import HANDOFF_SCHEMA
 
 AXES = ("personal_growth", "self_realization")
@@ -289,9 +289,9 @@ class AgentHandoff:
         with self.store._connection() as db:
             row = db.execute("SELECT * FROM agent_handoff_drafts WHERE id=?", (draft_id,)).fetchone()
             if row is None:
-                raise ValidationError("Unknown handoff draft")
+                raise NotFound("Unknown handoff draft")
             if row["body_hash"] != expected_hash:
-                raise ValidationError("Draft hash changed, confirmation refused")
+                raise Conflict("Draft hash changed, confirmation refused")
             body = json.loads(row["body_json"])
         if not isinstance(domain_scores, dict):
             raise ValidationError("domain_scores must be an object")

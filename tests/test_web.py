@@ -202,12 +202,22 @@ class AgentHandoffHttpTests(unittest.TestCase):
         _, context = self.get("/api/agent-context?start=2026-11-01&end=2026-11-05")
         self.assertIsNone(context["latest_draft"])
 
+    def test_goal_edit_status_codes_are_typed(self):
+        goal = {"title": "Sleep", "enough_condition": "Rested", "domain_ids": ["health"],
+                "user_confirmed": True}
+        _, created = self.post("/api/goals", goal)
+        stale = {**goal, "goal_id": created["goal_id"], "expected_version": 0}
+        self.assertEqual(self.post("/api/goals", {**stale, "expected_version": 2})[0], 409)
+        self.assertEqual(self.post("/api/goals", {**stale, "goal_id": "g_missing", "expected_version": 1})[0], 404)
+        self.assertEqual(self.post("/api/goals", {**goal, "user_confirmed": False})[0], 400)
+
     def test_confirm_requires_explicit_flag_and_current_hash(self):
         _, staged = self.post("/api/agent-draft", payload())
         base = {"draft_id": staged["draft_id"], "expected_hash": staged["draft_hash"],
                 "domain_scores": {"health": 3}}
         self.assertEqual(self.post("/api/agent-confirm", {**base, "user_confirmed": False})[0], 400)
-        self.assertEqual(self.post("/api/agent-confirm", {**base, "expected_hash": "0" * 64, "user_confirmed": True})[0], 400)
+        self.assertEqual(self.post("/api/agent-confirm", {**base, "expected_hash": "0" * 64, "user_confirmed": True})[0], 409)
+        self.assertEqual(self.post("/api/agent-confirm", {**base, "draft_id": "missing", "user_confirmed": True})[0], 404)
         self.no_review_saved()
         status, confirmed = self.post("/api/agent-confirm", {**base, "user_confirmed": True})
         self.assertEqual(status, 201)

@@ -41,7 +41,15 @@ class ValidationError(ValueError):
     """Unconfirmed or invalid product input."""
 
 
-class GoalConflict(ValidationError):
+class NotFound(ValidationError):
+    """A referenced record does not exist (HTTP 404)."""
+
+
+class Conflict(ValidationError):
+    """The caller acted on a stale version (HTTP 409); reload before retrying."""
+
+
+class GoalConflict(Conflict):
     """Optimistic concurrency prevented a lost goal edit."""
 
 
@@ -320,7 +328,7 @@ class LifeStore:
                     raise ValidationError("Updates require expected_version >= 1")
                 row = db.execute("SELECT version FROM goals WHERE id=?", (goal_id,)).fetchone()
                 if row is None:
-                    raise ValidationError("goal_id not found")
+                    raise NotFound("goal_id not found")
                 if row["version"] != expected_version:
                     raise GoalConflict(f"Goal version conflict: expected {expected_version}, actual {row['version']}")
                 version = expected_version + 1
