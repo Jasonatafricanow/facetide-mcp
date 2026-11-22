@@ -11,7 +11,7 @@ from importlib.resources import files
 from urllib.parse import parse_qs, urlsplit
 
 from . import __version__
-from .core import LifeStore, ValidationError
+from .core import Conflict, LifeStore, NotFound, ValidationError
 
 ASSETS = {"/": ("index.html", "text/html; charset=utf-8"),
           "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -138,6 +138,10 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
                     raise ValidationError("Unknown review fields")
                 result = self.server.store.save_review(**body)
             return self.reply(201, result)
+        except NotFound as exc:
+            return self.reply(404, {"error": str(exc)})
+        except Conflict as exc:
+            return self.reply(409, {"error": str(exc)})
         except (ValueError, TypeError, KeyError) as exc:
             return self.reply(400, {"error": str(exc)})
         except OSError:
