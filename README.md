@@ -209,6 +209,14 @@ For real MR-MEM / ATLAS / Nutrition adapters: implement the \`EvidenceSource.que
 - **No unverified medical or financial recommendations.**
 - Single-user local process; do not expose the stdio service as an unauthenticated network endpoint.
 
+## Read-only summary for WorkBench
+
+`GET /api/summary/v1` on the local web server gives an outside dashboard (Agent-WorkBench's Life view)
+the latest and previous user-confirmed reviews, the seven domain scores (null when unscored), the two
+reflection axes and current goals. It needs a configured service token (`FACETIDE_SUMMARY_TOKEN`),
+has no write path and never returns drafts, notes, evidence refs, conversation, nutrition or clinical
+data. Contract: [`docs/summary-v1.md`](docs/summary-v1.md).
+
 ## Tests
 
 ~~~sh
