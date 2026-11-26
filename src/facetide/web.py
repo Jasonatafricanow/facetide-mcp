@@ -6,6 +6,7 @@ import json
 import os
 import secrets
 import sys
+import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -164,6 +165,42 @@ class WorkbenchHandler(BaseHTTPRequestHandler):
             return self.reply(503, {"error": "Data source unavailable"})
 
 
+
+class SummaryHandler(WorkbenchHandler):
+    """Service listener for a dashboard in another container: GET /api/summary/v1 with the bearer token,
+    nothing else (no UI, no bootstrap token, no writes). The Host header is not checked because the caller
+    reaches this port by a non-loopback address; the service token is the only gate."""
+
+    def do_GET(self):
+        if urlsplit(self.path).path != "/api/summary/v1":
+            return self.reply(404, {"error": "Not found"})
+        try:
+            return self.summary()
+        except OSError:
+            return self.reply(503, {"error": "Data source unavailable"})
+
+    def do_POST(self):
+        return self.reply(404, {"error": "Not found"})
+
+    do_PUT = do_DELETE = do_PATCH = do_POST
+
+
+class SummaryServer(WorkbenchServer):
+    def __init__(self, address, store):
+        super().__init__(address, store)
+        self.RequestHandlerClass = SummaryHandler
+
+
+def summary_listen_address(value):
+    """FACETIDE_SUMMARY_LISTEN=host:port -> (host, port); empty -> None."""
+    if not value:
+        return None
+    host, sep, port = value.rpartition(":")
+    if not sep or not host or not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise ValueError("FACETIDE_SUMMARY_LISTEN must be host:port")
+    return host, int(port)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Facetide local workbench")
     parser.add_argument("--port", type=int, default=8765)
@@ -171,9 +208,16 @@ def main():
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error("port must be 1..65535")
-    server = WorkbenchServer(("127.0.0.1", args.port), LifeStore())
+    store = LifeStore()
+    server = WorkbenchServer(("127.0.0.1", args.port), store)
     url = f"http://127.0.0.1:{args.port}"
     print(f"Facetide local UI: {url}", file=sys.stderr)
+    listen = summary_listen_address(os.environ.get("FACETIDE_SUMMARY_LISTEN", ""))
+    if listen and server.summary_token:
+        # Separate socket, summary route only; the UI stays loopback-only.
+        side = SummaryServer(listen, store)
+        threading.Thread(target=side.serve_forever, daemon=True).start()
+        print(f"Facetide summary listener: {listen[0]}:{side.server_port}", file=sys.stderr)
     if not args.no_browser:
         webbrowser.open(url)
     try:

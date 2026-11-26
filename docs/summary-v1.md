@@ -17,6 +17,13 @@ Authorization: Bearer <FACETIDE_SUMMARY_TOKEN>
 - GET only, no query parameters, no write path (POST to this path is 404).
 - The server still only answers loopback `Host` headers (`127.0.0.1` / `localhost`), as every other route.
 
+### Service listener (dashboard in another container)
+
+`FACETIDE_SUMMARY_LISTEN=host:port` (for example `0.0.0.0:8875`) opens a second socket next to the
+loopback UI. It serves **only** `GET /api/summary/v1` with the same bearer token; every other path and
+method is 404, there is no UI and no `/api/bootstrap`. Its Host header is not checked, so keep the port
+behind a firewall that only lets the LAN/Docker in. It starts only when the summary token is set.
+
 ## Response
 
 ```json

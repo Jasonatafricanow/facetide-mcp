@@ -97,3 +97,49 @@ class SummaryApi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SummaryListener(unittest.TestCase):
+    """FACETIDE_SUMMARY_LISTEN: a second socket that a dashboard in another container can reach."""
+
+    def setUp(self):
+        from facetide.web import SummaryServer
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        with mock.patch.dict(os.environ, {"FACETIDE_SUMMARY_TOKEN": TOKEN}):
+            self.server = SummaryServer(("127.0.0.1", 0), LifeStore(Path(folder.name) / "data.sqlite3"))
+        thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(lambda: (self.server.shutdown(), self.server.server_close(), thread.join(timeout=3)))
+
+    def call(self, path, token=TOKEN, method="GET", host="172.27.0.1:8875"):
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        try:
+            headers = {"Host": host, **({"Authorization": f"Bearer {token}"} if token else {})}
+            conn.request(method, path, headers=headers)
+            reply = conn.getresponse()
+            return reply.status, json.loads(reply.read() or b"{}")
+        finally:
+            conn.close()
+
+    def test_summary_answers_a_non_loopback_host(self):
+        status, body = self.call("/api/summary/v1")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["contract"], "facetide.summary.v1")
+
+    def test_token_still_required(self):
+        self.assertEqual(self.call("/api/summary/v1", token=None)[0], 401)
+        self.assertEqual(self.call("/api/summary/v1", token="wrong-token-0123456789abcdef")[0], 401)
+
+    def test_nothing_else_is_served(self):
+        for path in ("/", "/api/bootstrap", "/api/snapshot", "/api/history", "/app.js"):
+            self.assertEqual(self.call(path)[0], 404, path)
+        self.assertEqual(self.call("/api/reviews", method="POST")[0], 404)
+
+    def test_listen_address_parsing(self):
+        from facetide.web import summary_listen_address
+        self.assertIsNone(summary_listen_address(""))
+        self.assertEqual(summary_listen_address("0.0.0.0:8875"), ("0.0.0.0", 8875))
+        for bad in ("8875", "host:", "host:0", "host:x"):
+            with self.assertRaises(ValueError):
+                summary_listen_address(bad)
